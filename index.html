@@ -11,22 +11,23 @@
   <style>
     :root{--ink:#eef3ea;--muted:#9aab9e;--line:rgba(238,243,234,.12);--safeb:env(safe-area-inset-bottom,16px);--safet:env(safe-area-inset-top,8px)}
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;touch-action:manipulation}
+    html,body{height:100%;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#0b1210;color:var(--ink);overflow:hidden}
     button,input{font-family:inherit}
     button{cursor:pointer;-webkit-tap-highlight-color:transparent;border:0}
     input{width:100%;background:#15201c;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px;margin:6px 0 12px}
     #app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;position:relative;background:#0b1210}
-    canvas#phys{position:absolute;inset:0;width:100%;height:100%;z-index:1}
-    .hud{position:relative;z-index:4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:calc(8px + var(--safet)) 14px 8px;background:rgba(11,18,16,.94);border-bottom:1px solid var(--line)}
+    canvas#phys{position:absolute;inset:0;width:100%;height:100%;z-index:5}
+    .hud{position:relative;z-index:8;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:calc(8px + var(--safet)) 14px 8px;background:rgba(11,18,16,.94);border-bottom:1px solid var(--line);-webkit-user-select:none;user-select:none}
     .stat{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
     .stat b{display:block;font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0;margin:2px 0 5px}
     .bar{height:7px;background:#24332e;border-radius:99px;overflow:hidden}
     .bar>i{display:block;height:100%}
     .e>i{background:#d4e07a}.f>i{background:#7ec8c0}.p>i{background:#e8a07a}
     #med{grid-column:1/-1;font-size:11px;color:var(--muted)}
-    #stage{flex:1;overflow-y:auto;padding:16px 16px calc(18px + var(--safeb));position:relative;z-index:3;pointer-events:none}
-    #stage *{pointer-events:auto}
+    #stage{flex:1;overflow-y:auto;padding:16px 16px calc(18px + var(--safeb));position:relative;z-index:6;pointer-events:none}
+    #stage input,#stage button,#stage .card,#stage .btn,#hold{pointer-events:auto;position:relative;z-index:7}
+    #stage h1,#stage h2,#stage p,#stage .kicker,#stage .tiny,#stage label{pointer-events:none}
     h1{font-family:ui-serif,Georgia,serif;font-size:34px;margin:8px 0}
     h2{font-family:ui-serif,Georgia,serif;font-size:22px;margin:0 0 10px}
     p{color:#d7e0d4;line-height:1.5;margin-bottom:10px}
@@ -74,14 +75,15 @@ let engine, world, holdBody=null, balls=[];
 const canvas=document.getElementById("phys");
 const ctx=canvas.getContext("2d");
 const clockEl=document.getElementById("clock"), eBar=document.getElementById("eBar"), fBar=document.getElementById("fBar"), pBar=document.getElementById("pBar"), med=document.getElementById("med");
-
+let view={w:320,h:640};
 function sizeCanvas(){
   const r=document.getElementById("app").getBoundingClientRect();
   const d=Math.min(2,window.devicePixelRatio||1);
   canvas.width=r.width*d; canvas.height=r.height*d;
   canvas.style.width=r.width+"px"; canvas.style.height=r.height+"px";
   ctx.setTransform(d,0,0,d,0,0);
-  return {w:r.width,h:r.height};
+  view={w:r.width,h:r.height};
+  return view;
 }
 function fresh(form){
   return {
@@ -142,7 +144,7 @@ function toast(html){
 function parseHM(v,fb){if(!v||!v.includes(":"))return fb;const[h,m]=v.split(":").map(Number);return h*60+m}
 function bootPhysics(){
   if(engine){ World.clear(world,false); Engine.clear(engine); }
-  engine=Engine.create({gravity:{x:0,y:0}});
+  engine=Engine.create({gravity:{x:0,y:0},enableSleeping:false});
   world=engine.world;
   const {w,h}=sizeCanvas();
   World.add(world,[
@@ -177,10 +179,11 @@ function syncHold(){
   Body.setPosition(holdBody,{x:r.left-app.left+r.width/2,y:r.top-app.top+r.height/2});
 }
 function spawnBall(text,kind){
-  const {w,h}=sizeCanvas();
-  const r=kind==="work"?28:22;
+  const {w,h}=view;
+  const r=kind==="work"?34:30;
   const b=Bodies.circle(40+Math.random()*(w-80),90+Math.random()*(h*0.3),r,{
-    restitution:0.92, friction:0.002, frictionAir:0.008, density:kind==="work"?0.004:0.002, label:kind
+    restitution:0.98, friction:0, frictionAir:0.002, density:kind==="work"?0.003:0.0015,
+    label:kind, sleepThreshold:Infinity
   });
   b.plugin={kind,text};
   Body.setVelocity(b,{x:Math.random()*3-1.5,y:Math.random()*3-1.5});
@@ -199,20 +202,36 @@ function pokeBall(b){
   }
   hud();
 }
+function wrapLabel(text,maxW,font){
+  ctx.font=font;
+  const words=String(text||"").split(" ");
+  const lines=[]; let line="";
+  words.forEach(w=>{
+    const t=line?line+" "+w:w;
+    if(ctx.measureText(t).width<=maxW) line=t;
+    else{ if(line) lines.push(line); line=w; }
+  });
+  if(line) lines.push(line);
+  return lines.slice(0,3);
+}
 function drawWorld(){
-  const {w,h}=sizeCanvas();
-  ctx.clearRect(0,0,w,h);
+  ctx.clearRect(0,0,view.w,view.h);
   if(scene!=="desk")return;
   balls.forEach(b=>{
     const k=b.plugin&&b.plugin.kind;
-    ctx.beginPath(); ctx.arc(b.position.x,b.position.y,b.circleRadius,0,Math.PI*2);
-    ctx.fillStyle=k==="work"?"rgba(20,36,34,0.92)":"rgba(40,22,22,0.92)"; ctx.fill();
-    ctx.strokeStyle=k==="work"?"rgba(126,200,192,0.75)":"rgba(232,160,122,0.75)"; ctx.lineWidth=2; ctx.stroke();
+    const r=b.circleRadius;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(b.position.x,b.position.y,r,0,Math.PI*2);
+    ctx.fillStyle=k==="work"?"rgba(20,36,34,0.94)":"rgba(40,22,22,0.94)"; ctx.fill();
+    ctx.strokeStyle=k==="work"?"rgba(126,200,192,0.8)":"rgba(232,160,122,0.8)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.clip();
+    const font="10px system-ui,sans-serif";
+    const lines=wrapLabel(b.plugin.text,r*1.55,font);
     ctx.fillStyle=k==="work"?"#d7efea":"#f3d2c4";
-    ctx.font="11px system-ui,sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-    const words=(b.plugin.text||"").split(" ");
-    ctx.fillText(words.slice(0,3).join(" "),b.position.x,b.position.y-6);
-    ctx.fillText(words.slice(3).join(" "),b.position.x,b.position.y+8);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const start=-(lines.length-1)*6;
+    lines.forEach((ln,i)=>ctx.fillText(ln,b.position.x,b.position.y+start+i*12));
+    ctx.restore();
   });
 }
 canvas.addEventListener("pointerdown",e=>{
@@ -228,99 +247,3 @@ function show(id){
     document.getElementById("hud").hidden=true;
     st.innerHTML=`<div class="kicker">ADHD desk sim</div><h1>Static</h1>
       <p>Not a diagnosis. Thoughts are bodies. They bounce. They hit the work. Looking at them costs time.</p>
-      <label class="tiny">Your name</label><input id="nm" placeholder="Alex" />
-      <label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher…" />
-      <label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids…" />
-      <label class="tiny">The one thing that actually matters today</label><input id="imp" placeholder="Finish the report / pay the bill" />
-      <label class="tiny">Wake · start · end</label>
-      <div class="times"><input id="wk" type="time" value="06:30" /><input id="stt" type="time" value="08:00" /><input id="en" type="time" value="17:00" /></div>
-      <label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" />I take stimulant meds</label>
-      <button class="btn main" type="button" onclick="begin()">Start the day</button>
-      <p class="tiny">Hold to work. Thoughts collide. Teal asks become Taskers.</p>`;
-    return;
-  }
-  if(id==="desk"){
-    document.getElementById("hud").hidden=false;
-    st.innerHTML=`<div class="kicker">${S.job} · hold to work</div><h2 id="cur">${S.important}</h2>
-      <div class="prog"><i id="pfill"></i></div>
-      <button id="hold" type="button">Hold to focus</button>
-      <p class="tiny">Hold and they glance off. Idle and they nick the bar.</p>
-      <div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div>
-      <button class="btn" type="button" onclick="show('end')">End the day</button>`;
-    bindHold(); renderTasks(); bootPhysics();
-    lateThoughts.sort(()=>Math.random()-.5).slice(0,5).forEach(t=>spawnBall(t,"late"));
-    workAsks.slice(0,2).forEach(t=>spawnBall(t,"work"));
-    startLoop(); hud();
-  }
-  if(id==="end"){
-    const main=S.tasks.find(t=>t.kind==="main");
-    st.innerHTML=`<div class="kicker">After</div>
-      <h2>${main&&main.prog>=100?"The thing got done. The cost is below.":"The thing did not finish. That is the usual ending."}</h2>
-      <p>${S.name} did ${S.job}. ${S.home} got whoever arrived at ${mil(S.time)}.</p>
-      <div class="grid"><div><b>${S.done}</b>closed</div><div><b>${S.started}</b>opened</div><div><b>${S.interrupts}</b>hallway asks</div><div><b>${S.peach}</b>thought taps</div></div>
-      <p class="tiny">Not medical advice.</p>
-      <button class="btn main" type="button" onclick="show('setup')">New person</button>`;
-  }
-}
-function begin(){
-  S=fresh({
-    name:document.getElementById("nm").value.trim(),
-    job:document.getElementById("jb").value.trim(),
-    home:document.getElementById("hm").value.trim(),
-    important:document.getElementById("imp").value.trim(),
-    wake:parseHM(document.getElementById("wk").value,6*60+30),
-    start:parseHM(document.getElementById("stt").value,8*60),
-    end:parseHM(document.getElementById("en").value,17*60),
-    meds:document.getElementById("md").checked
-  });
-  addTask(S.important,"main"); addTask("Inbox that will not zero","side"); addTask("Something promised yesterday","side");
-  S.working=0; show("desk");
-}
-function bindHold(){
-  const btn=document.getElementById("hold");
-  const on=e=>{e.preventDefault();holding=true;btn.classList.add("down")};
-  const off=()=>{holding=false;btn.classList.remove("down")};
-  btn.addEventListener("pointerdown",on); btn.addEventListener("pointerup",off);
-  btn.addEventListener("pointercancel",off); btn.addEventListener("pointerleave",off);
-}
-function startLoop(){
-  cancelAnimationFrame(loop);
-  let last=performance.now();
-  const step=now=>{
-    const dt=Math.min(.05,(now-last)/1000); last=now;
-    if(scene==="desk"&&engine){
-      Engine.update(engine,1000/60); syncHold();
-      const extra=S.tasks.filter(t=>t.open).length;
-      if(balls.length<5+Math.min(6,extra)&&Math.random()<0.012) spawnBall(lateThoughts[Math.floor(Math.random()*lateThoughts.length)],"late");
-      if(!S.off&&balls.filter(b=>b.plugin.kind==="work").length<2&&Math.random()<0.004) spawnBall(workAsks[Math.floor(Math.random()*workAsks.length)],"work");
-      if(S.off){ balls.filter(b=>b.plugin.kind==="work").forEach(b=>World.remove(world,b)); balls=balls.filter(b=>b.plugin.kind!=="work"); }
-      drawWorld();
-      S.time+=dt*2.6;
-      if(S.time>=S.start+2*60) weather();
-      if(holding&&S.working>=0){
-        const t=S.tasks[S.working];
-        if(t&&t.open){
-          t.prog=clamp(t.prog+(S.medOn?16:10)*(S.focus/100)*dt,0,100);
-          S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
-          S.energy=clamp(S.energy-3*dt,0,100);
-          if(t.prog>=100) closeWorking();
-        }
-      }else{
-        S.focus=clamp(S.focus-5*dt,0,100);
-        S.tasks.forEach(t=>{if(t.open&&t.kind!=="main") t.prog=Math.max(0,t.prog-1.2*dt)});
-      }
-      if(S.time>=S.end&&!S.off){ S.off=true; toast(S.home+" is the clock now. Hallway asks clocked out."); }
-      if(S.time>=S.end+180){ show("end"); return; }
-      const t=S.tasks[S.working], fill=document.getElementById("pfill");
-      if(fill&&t) fill.style.width=t.prog+"%";
-      hud();
-    }
-    loop=requestAnimationFrame(step);
-  };
-  loop=requestAnimationFrame(step);
-}
-window.addEventListener("resize",()=>{ if(scene==="desk") bootPhysics(); });
-show("setup");
-</script>
-</body>
-</html>
