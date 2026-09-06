@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b1210" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Static" />
+  <title>Static</title>
+  <style>
+    :root{--ink:#eef3ea;--muted:#9aab9e;--line:rgba(238,243,234,.12);--safeb:env(safe-area-inset-bottom,16px);--safet:env(safe-area-inset-top,8px)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;touch-action:manipulation}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#0b1210;color:var(--ink);overflow:hidden}
+    button,input{font-family:inherit}
+    button{cursor:pointer;-webkit-tap-highlight-color:transparent;border:0}
+    input{width:100%;background:#15201c;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px;margin:6px 0 12px}
+    #app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;background:radial-gradient(900px 400px at 80% -10%,#1c3a32 0%,transparent 50%),#0b1210}
+    .hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:calc(8px + var(--safet)) 14px 8px;background:rgba(11,18,16,.94);border-bottom:1px solid var(--line)}
+    .stat{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .stat b{display:block;font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0;margin:2px 0 5px}
+    .bar{height:7px;background:#24332e;border-radius:99px;overflow:hidden}
+    .bar>i{display:block;height:100%}
+    .e>i{background:#d4e07a}.f>i{background:#7ec8c0}.p>i{background:#e8a07a}
+    #med{grid-column:1/-1;font-size:11px;color:var(--muted)}
+    #stage{flex:1;overflow-y:auto;padding:16px 16px calc(18px + var(--safeb))}
+    h1{font-family:ui-serif,Georgia,serif;font-size:34px;margin:8px 0}
+    h2{font-family:ui-serif,Georgia,serif;font-size:22px;margin:0 0 10px}
+    p{color:#d7e0d4;line-height:1.5;margin-bottom:10px}
+    .kicker{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+    .tiny{font-size:12px;color:var(--muted);line-height:1.45}
+    .card{background:#15201c;border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+    .btn{display:block;width:100%;text-align:left;background:#1b2824;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px;font-size:16px;margin-top:8px}
+    .btn.main{border-color:rgba(212,224,122,.45)}
+    #hold{width:100%;height:120px;border-radius:20px;border:1px solid rgba(126,200,192,.45);background:#13221e;color:var(--ink);font-size:18px;font-weight:650;margin:8px 0 12px}
+    #hold.down{background:#1c3a32}
+    .prog{height:10px;background:#24332e;border-radius:99px;overflow:hidden;margin:6px 0 14px}
+    .prog>i{display:block;height:100%;width:0;background:#7ec8c0}
+    .task{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+    .task.main{color:#ffe7a8}
+    .task button{background:#1b2824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px}
+    #bubbles{position:fixed;inset:0;pointer-events:none;z-index:20;max-width:480px;margin:0 auto}
+    .bubble{position:absolute;pointer-events:auto;max-width:150px;padding:9px 11px;border-radius:999px;background:rgba(40,22,22,.86);border:1px solid rgba(232,160,122,.45);color:#f3d2c4;font-size:12px}
+    .bubble.work{background:rgba(20,36,34,.88);border-color:rgba(126,200,192,.4);color:#d7efea;border-radius:16px}
+    .popup{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:30}
+    .popup.show{display:flex}
+    .sheet{width:100%;max-width:480px;background:#17241f;border-radius:20px 20px 0 0;padding:20px 16px calc(18px + var(--safeb))}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+    .grid div{background:#1b2824;border-radius:12px;padding:12px;font-size:12px;color:var(--muted)}
+    .grid b{display:block;color:var(--ink);font-size:20px;font-family:ui-serif,Georgia,serif}
+    .times{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="hud" id="hud" hidden>
+    <div class="stat"><b id="clock">0700</b>Energy<div class="bar e"><i id="eBar"></i></div></div>
+    <div class="stat"><b>Focus</b><div class="bar f"><i id="fBar"></i></div></div>
+    <div class="stat"><b>Their patience</b><div class="bar p"><i id="pBar"></i></div></div>
+    <div id="med">meds: —</div>
+  </div>
+  <div id="stage"></div>
+</div>
+<div class="popup" id="popup"></div>
+<div id="bubbles"></div>
+<script>
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const mil=m=>{const x=((Math.floor(m)%1440)+1440)%1440;return String(Math.floor(x/60)).padStart(2,"0")+String(x%60).padStart(2,"0")};
+const lateThoughts=["You're already behind.","Don't look at the clock.","Look at the clock.","They think you don't care.","Start. Just start.","This should be easy.","You'll stay late.","One more minute.","You forgot something."];
+let S, loop=0, holding=false, bubbles=[], raf=0, scene="setup";
+const clockEl=document.getElementById("clock"), eBar=document.getElementById("eBar"), fBar=document.getElementById("fBar"), pBar=document.getElementById("pBar"), med=document.getElementById("med");
+
+function fresh(form){
+  return {
+    name:form.name||"You", job:form.job||"work", home:form.home||"someone at home",
+    start:form.start??8*60, end:form.end??17*60,
+    important:form.important||"The one thing that actually matters",
+    meds:!!form.meds, medOn:!!form.meds,
+    time:form.wake??7*60, energy:62, focus:36, patience:70,
+    peach:0, interrupts:0, started:0, done:0, working:0, tasks:[], off:false
+  };
+}
+function hud(){
+  if(document.getElementById("hud").hidden)return;
+  clockEl.textContent=mil(S.time);
+  eBar.style.width=S.energy+"%"; fBar.style.width=S.focus+"%"; pBar.style.width=S.patience+"%";
+  med.textContent=S.meds?(S.medOn?"meds: holding":"meds: missing / crashed"):"meds: none";
+}
+function weather(){
+  if(!S.meds){S.medOn=false;return}
+  if(S.time>=S.start+6*60) S.medOn=Math.random()>0.65;
+  else if(S.time>=S.start+2*60) S.medOn=Math.random()>0.4;
+  else S.medOn=true;
+}
+function addTask(title,kind,need){
+  if(S.tasks.some(t=>t.title===title))return;
+  S.tasks.push({title,kind:kind||"side",need:need||40,prog:0,open:true});
+  S.started++;
+  renderTasks();
+}
+function renderTasks(){
+  const box=document.getElementById("taskbox");
+  if(!box)return;
+  box.innerHTML=S.tasks.filter(t=>t.open).map(t=>{
+    const i=S.tasks.indexOf(t);
+    return `<div class="task ${t.kind==="main"?"main":""}"><span>${t.title}<div class="tiny">${Math.floor(t.prog)}% · ${t.kind==="main"?"THE thing":t.kind}</div></span><button type="button" onclick="pickTask(${i})">${S.working===i?"Current":"Work"}</button></div>`;
+  }).join("")||`<div class="tiny">No open Taskers.</div>`;
+}
+function pickTask(i){
+  if(S.working!==i) S.focus=clamp(S.focus-14,0,100);
+  S.working=i;
+  const t=S.tasks[i], cur=document.getElementById("cur");
+  if(cur) cur.textContent=t?t.title:"—";
+  renderTasks(); hud();
+}
+function closeWorking(){
+  const t=S.tasks[S.working];
+  if(!t||!t.open)return;
+  t.open=false; t.prog=100; S.done++;
+  S.working=S.tasks.findIndex(x=>x.open);
+  const cur=document.getElementById("cur");
+  if(cur) cur.textContent=S.working>=0?S.tasks[S.working].title:"Clear";
+  renderTasks();
+}
+function spawn(text,kind){
+  const host=document.getElementById("app").getBoundingClientRect();
+  const el=document.createElement("button");
+  el.type="button"; el.className="bubble"+(kind==="work"?" work":""); el.textContent=text;
+  document.getElementById("bubbles").appendChild(el);
+  const b={el,kind,text,x:10+Math.random()*Math.max(40,host.width-140),y:90+Math.random()*Math.max(40,host.height-180),vx:(.5+Math.random())*(Math.random()>.5?1:-1),vy:(.5+Math.random())*(Math.random()>.5?1:-1)};
+  el.style.left=b.x+"px"; el.style.top=b.y+"px";
+  el.onclick=e=>{
+    e.stopPropagation();
+    if(kind==="late"){
+      S.peach++; S.time+=S.peach===1?1:Math.min(10,S.peach*2); S.focus=clamp(S.focus-5,0,100); holding=false;
+      if(S.peach===1) toast("Looking at the thought is the tax. Next taps cost more.");
+    } else {
+      S.interrupts++; S.time+=5+Math.floor(Math.random()*8); S.focus=clamp(S.focus-12,0,100); S.patience=clamp(S.patience-4,0,100);
+      addTask(text,"interrupt",25); holding=false;
+    }
+    el.remove(); bubbles=bubbles.filter(x=>x!==b);
+    setTimeout(()=>{if(scene==="desk"&&!(kind==="work"&&S.off)) spawn(text,kind)}, kind==="work"?16000:700);
+    hud();
+  };
+  bubbles.push(b);
+}
+function tickBubbles(){
+  const host=document.getElementById("app").getBoundingClientRect();
+  const sp=1+S.tasks.filter(t=>t.open).length*0.2;
+  bubbles.forEach(b=>{
+    const m=b.kind==="late"?sp:1;
+    b.x+=b.vx*m; b.y+=b.vy*m;
+    const w=b.el.offsetWidth,h=b.el.offsetHeight;
+    if(b.x<6||b.x>host.width-w-6) b.vx*=-1;
+    if(b.y<70||b.y>host.height-h-20) b.vy*=-1;
+    b.el.style.left=b.x+"px"; b.el.style.top=b.y+"px";
+  });
+  raf=requestAnimationFrame(tickBubbles);
+}
+function clearBubbles(){cancelAnimationFrame(raf);bubbles.forEach(b=>b.el.remove());bubbles=[]}
+function toast(html){
+  const p=document.getElementById("popup");
+  p.innerHTML=`<div class="sheet"><p>${html}</p><button class="btn main" type="button" onclick="document.getElementById('popup').classList.remove('show')">Ok</button></div>`;
+  p.classList.add("show");
+}
+function parseHM(v,fb){if(!v||!v.includes(":"))return fb;const[h,m]=v.split(":").map(Number);return h*60+m}
+
+function show(id){
+  scene=id; clearBubbles(); holding=false;
+  const st=document.getElementById("stage");
+  if(id==="setup"){
+    document.getElementById("hud").hidden=true;
+    st.innerHTML=`<div class="kicker">ADHD desk sim</div><h1>Static</h1>
+      <p>Not a diagnosis. A machine that charges you for switching, interrupting, and staring at the thought.</p>
+      <label class="tiny">Your name</label><input id="nm" placeholder="Alex" />
+      <label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher…" />
+      <label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids…" />
+      <label class="tiny">The one thing that actually matters today</label><input id="imp" placeholder="Finish the report / pay the bill" />
+      <label class="tiny">Wake · start · end</label>
+      <div class="times"><input id="wk" type="time" value="06:30" /><input id="stt" type="time" value="08:00" /><input id="en" type="time" value="17:00" /></div>
+      <label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" />I take stimulant meds</label>
+      <button class="btn main" type="button" onclick="begin()">Start the day</button>
+      <p class="tiny">Hold the big button to work. Switching tasks costs focus. Peach thoughts cost time. Teal asks become Taskers.</p>`;
+    return;
+  }
+  if(id==="desk"){
+    document.getElementById("hud").hidden=false;
+    st.innerHTML=`<div class="kicker">${S.job} · hold to work</div><h2 id="cur">${S.important}</h2>
+      <div class="prog"><i id="pfill"></i></div>
+      <button id="hold" type="button">Hold to focus</button>
+      <p class="tiny">Progress only while you hold. Let go and side tasks leak. The clock does not wait.</p>
+      <div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div>
+      <button class="btn" type="button" onclick="show('end')">End the day</button>`;
+    bindHold(); renderTasks();
+    lateThoughts.sort(()=>Math.random()-.5).slice(0,6).forEach(t=>spawn(t,"late"));
+    spawn("Can you just look at this?","work");
+    spawn("Quick question. Two minutes.","work");
+    tickBubbles(); startLoop(); hud();
+  }
+  if(id==="end"){
+    clearBubbles();
+    const main=S.tasks.find(t=>t.kind==="main");
+    st.innerHTML=`<div class="kicker">After</div>
+      <h2>${main&&main.prog>=100?"The thing got done. The cost is below.":"The thing did not finish. That is the usual ending."}</h2>
+      <p>${S.name} did ${S.job}. ${S.home} got whoever arrived at ${mil(S.time)}.</p>
+      <div class="grid"><div><b>${S.done}</b>closed</div><div><b>${S.started}</b>opened</div><div><b>${S.interrupts}</b>hallway asks</div><div><b>${S.peach}</b>thought taps</div></div>
+      <p class="tiny">Modeled: time blindness, switch cost, interrupt tax, thoughts that speed up with an open list. Not medical advice.</p>
+      <button class="btn main" type="button" onclick="show('setup')">New person</button>`;
+  }
+}
+function begin(){
+  S=fresh({
+    name:document.getElementById("nm").value.trim(),
+    job:document.getElementById("jb").value.trim(),
+    home:document.getElementById("hm").value.trim(),
+    important:document.getElementById("imp").value.trim(),
+    wake:parseHM(document.getElementById("wk").value,6*60+30),
+    start:parseHM(document.getElementById("stt").value,8*60),
+    end:parseHM(document.getElementById("en").value,17*60),
+    meds:document.getElementById("md").checked
+  });
+  addTask(S.important,"main",100);
+  addTask("Inbox that will not zero","side",60);
+  addTask("Something promised yesterday","side",50);
+  S.working=0;
+  show("desk");
+}
+function bindHold(){
+  const btn=document.getElementById("hold");
+  const on=e=>{e.preventDefault();holding=true;btn.classList.add("down")};
+  const off=()=>{holding=false;btn.classList.remove("down")};
+  btn.addEventListener("pointerdown",on); btn.addEventListener("pointerup",off);
+  btn.addEventListener("pointercancel",off); btn.addEventListener("pointerleave",off);
+}
+function startLoop(){
+  cancelAnimationFrame(loop);
+  let last=performance.now();
+  const step=now=>{
+    const dt=Math.min(.05,(now-last)/1000); last=now;
+    if(scene!=="desk")return;
+    S.time+=dt*2.6;
+    if(S.time>=S.start+2*60) weather();
+    if(holding && S.working>=0){
+      const t=S.tasks[S.working];
+      if(t&&t.open){
+        t.prog=clamp(t.prog+(S.medOn?16:10)*(S.focus/100)*dt,0,100);
+        S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
+        S.energy=clamp(S.energy-3*dt,0,100);
+        if(t.prog>=100) closeWorking();
+      }
+    } else {
+      S.focus=clamp(S.focus-5*dt,0,100);
+      S.tasks.forEach(t=>{if(t.open&&t.kind!=="main") t.prog=Math.max(0,t.prog-1.2*dt)});
+    }
+    if(S.time>=S.end && !S.off){
+      S.off=true;
+      bubbles.filter(b=>b.kind==="work").forEach(b=>b.el.remove());
+      bubbles=bubbles.filter(b=>b.kind!=="work");
+      toast(S.home+" is the clock now. Hallway asks have clocked out.");
+    }
+    if(S.time>=S.end+180){show("end");return}
+    const t=S.tasks[S.working], fill=document.getElementById("pfill");
+    if(fill&&t) fill.style.width=t.prog+"%";
+    hud();
+    loop=requestAnimationFrame(step);
+  };
+  loop=requestAnimationFrame(step);
+}
+show("setup");
+</script>
+</body>
+</html>
