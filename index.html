@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Static" />
   <title>Static</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <style>
     :root{--ink:#eef3ea;--muted:#9aab9e;--line:rgba(238,243,234,.12);--safeb:env(safe-area-inset-bottom,16px);--safet:env(safe-area-inset-top,8px)}
     *{box-sizing:border-box;margin:0;padding:0}
@@ -15,33 +16,32 @@
     button,input{font-family:inherit}
     button{cursor:pointer;-webkit-tap-highlight-color:transparent;border:0}
     input{width:100%;background:#15201c;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:16px;margin:6px 0 12px}
-    #app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;background:radial-gradient(900px 400px at 80% -10%,#1c3a32 0%,transparent 50%),#0b1210}
-    .hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:calc(8px + var(--safet)) 14px 8px;background:rgba(11,18,16,.94);border-bottom:1px solid var(--line)}
+    #app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;position:relative;background:#0b1210}
+    canvas#phys{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+    .hud{position:relative;z-index:4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:calc(8px + var(--safet)) 14px 8px;background:rgba(11,18,16,.94);border-bottom:1px solid var(--line)}
     .stat{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
     .stat b{display:block;font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0;margin:2px 0 5px}
     .bar{height:7px;background:#24332e;border-radius:99px;overflow:hidden}
     .bar>i{display:block;height:100%}
     .e>i{background:#d4e07a}.f>i{background:#7ec8c0}.p>i{background:#e8a07a}
     #med{grid-column:1/-1;font-size:11px;color:var(--muted)}
-    #stage{flex:1;overflow-y:auto;padding:16px 16px calc(18px + var(--safeb))}
+    #stage{flex:1;overflow-y:auto;padding:16px 16px calc(18px + var(--safeb));position:relative;z-index:3;pointer-events:none}
+    #stage *{pointer-events:auto}
     h1{font-family:ui-serif,Georgia,serif;font-size:34px;margin:8px 0}
     h2{font-family:ui-serif,Georgia,serif;font-size:22px;margin:0 0 10px}
     p{color:#d7e0d4;line-height:1.5;margin-bottom:10px}
     .kicker{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
     .tiny{font-size:12px;color:var(--muted);line-height:1.45}
-    .card{background:#15201c;border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
+    .card{background:rgba(21,32,28,.92);border:1px solid var(--line);border-radius:16px;padding:14px;margin:10px 0}
     .btn{display:block;width:100%;text-align:left;background:#1b2824;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px;font-size:16px;margin-top:8px}
     .btn.main{border-color:rgba(212,224,122,.45)}
-    #hold{width:100%;height:120px;border-radius:20px;border:1px solid rgba(126,200,192,.45);background:#13221e;color:var(--ink);font-size:18px;font-weight:650;margin:8px 0 12px}
+    #hold{width:100%;height:110px;border-radius:20px;border:1px solid rgba(126,200,192,.45);background:rgba(19,34,30,.92);color:var(--ink);font-size:18px;font-weight:650;margin:8px 0 12px}
     #hold.down{background:#1c3a32}
     .prog{height:10px;background:#24332e;border-radius:99px;overflow:hidden;margin:6px 0 14px}
     .prog>i{display:block;height:100%;width:0;background:#7ec8c0}
     .task{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
     .task.main{color:#ffe7a8}
     .task button{background:#1b2824;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px}
-    #bubbles{position:fixed;inset:0;pointer-events:none;z-index:20;max-width:480px;margin:0 auto}
-    .bubble{position:absolute;pointer-events:auto;max-width:150px;padding:9px 11px;border-radius:999px;background:rgba(40,22,22,.86);border:1px solid rgba(232,160,122,.45);color:#f3d2c4;font-size:12px}
-    .bubble.work{background:rgba(20,36,34,.88);border-color:rgba(126,200,192,.4);color:#d7efea;border-radius:16px}
     .popup{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:30}
     .popup.show{display:flex}
     .sheet{width:100%;max-width:480px;background:#17241f;border-radius:20px 20px 0 0;padding:20px 16px calc(18px + var(--safeb))}
@@ -53,6 +53,7 @@
 </head>
 <body>
 <div id="app">
+  <canvas id="phys"></canvas>
   <div class="hud" id="hud" hidden>
     <div class="stat"><b id="clock">0700</b>Energy<div class="bar e"><i id="eBar"></i></div></div>
     <div class="stat"><b>Focus</b><div class="bar f"><i id="fBar"></i></div></div>
@@ -62,14 +63,26 @@
   <div id="stage"></div>
 </div>
 <div class="popup" id="popup"></div>
-<div id="bubbles"></div>
 <script>
+const {Engine, World, Bodies, Body, Events, Query} = Matter;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const mil=m=>{const x=((Math.floor(m)%1440)+1440)%1440;return String(Math.floor(x/60)).padStart(2,"0")+String(x%60).padStart(2,"0")};
 const lateThoughts=["You're already behind.","Don't look at the clock.","Look at the clock.","They think you don't care.","Start. Just start.","This should be easy.","You'll stay late.","One more minute.","You forgot something."];
-let S, loop=0, holding=false, bubbles=[], raf=0, scene="setup";
+const workAsks=["Can you just look at this?","Quick question. Two minutes.","Forwarding this to you.","Got a sec?"];
+let S, loop=0, holding=false, scene="setup";
+let engine, world, holdBody=null, balls=[];
+const canvas=document.getElementById("phys");
+const ctx=canvas.getContext("2d");
 const clockEl=document.getElementById("clock"), eBar=document.getElementById("eBar"), fBar=document.getElementById("fBar"), pBar=document.getElementById("pBar"), med=document.getElementById("med");
 
+function sizeCanvas(){
+  const r=document.getElementById("app").getBoundingClientRect();
+  const d=Math.min(2,window.devicePixelRatio||1);
+  canvas.width=r.width*d; canvas.height=r.height*d;
+  canvas.style.width=r.width+"px"; canvas.style.height=r.height+"px";
+  ctx.setTransform(d,0,0,d,0,0);
+  return {w:r.width,h:r.height};
+}
 function fresh(form){
   return {
     name:form.name||"You", job:form.job||"work", home:form.home||"someone at home",
@@ -92,11 +105,10 @@ function weather(){
   else if(S.time>=S.start+2*60) S.medOn=Math.random()>0.4;
   else S.medOn=true;
 }
-function addTask(title,kind,need){
+function addTask(title,kind){
   if(S.tasks.some(t=>t.title===title))return;
-  S.tasks.push({title,kind:kind||"side",need:need||40,prog:0,open:true});
-  S.started++;
-  renderTasks();
+  S.tasks.push({title,kind:kind||"side",prog:0,open:true});
+  S.started++; renderTasks();
 }
 function renderTasks(){
   const box=document.getElementById("taskbox");
@@ -122,56 +134,100 @@ function closeWorking(){
   if(cur) cur.textContent=S.working>=0?S.tasks[S.working].title:"Clear";
   renderTasks();
 }
-function spawn(text,kind){
-  const host=document.getElementById("app").getBoundingClientRect();
-  const el=document.createElement("button");
-  el.type="button"; el.className="bubble"+(kind==="work"?" work":""); el.textContent=text;
-  document.getElementById("bubbles").appendChild(el);
-  const b={el,kind,text,x:10+Math.random()*Math.max(40,host.width-140),y:90+Math.random()*Math.max(40,host.height-180),vx:(.5+Math.random())*(Math.random()>.5?1:-1),vy:(.5+Math.random())*(Math.random()>.5?1:-1)};
-  el.style.left=b.x+"px"; el.style.top=b.y+"px";
-  el.onclick=e=>{
-    e.stopPropagation();
-    if(kind==="late"){
-      S.peach++; S.time+=S.peach===1?1:Math.min(10,S.peach*2); S.focus=clamp(S.focus-5,0,100); holding=false;
-      if(S.peach===1) toast("Looking at the thought is the tax. Next taps cost more.");
-    } else {
-      S.interrupts++; S.time+=5+Math.floor(Math.random()*8); S.focus=clamp(S.focus-12,0,100); S.patience=clamp(S.patience-4,0,100);
-      addTask(text,"interrupt",25); holding=false;
-    }
-    el.remove(); bubbles=bubbles.filter(x=>x!==b);
-    setTimeout(()=>{if(scene==="desk"&&!(kind==="work"&&S.off)) spawn(text,kind)}, kind==="work"?16000:700);
-    hud();
-  };
-  bubbles.push(b);
-}
-function tickBubbles(){
-  const host=document.getElementById("app").getBoundingClientRect();
-  const sp=1+S.tasks.filter(t=>t.open).length*0.2;
-  bubbles.forEach(b=>{
-    const m=b.kind==="late"?sp:1;
-    b.x+=b.vx*m; b.y+=b.vy*m;
-    const w=b.el.offsetWidth,h=b.el.offsetHeight;
-    if(b.x<6||b.x>host.width-w-6) b.vx*=-1;
-    if(b.y<70||b.y>host.height-h-20) b.vy*=-1;
-    b.el.style.left=b.x+"px"; b.el.style.top=b.y+"px";
-  });
-  raf=requestAnimationFrame(tickBubbles);
-}
-function clearBubbles(){cancelAnimationFrame(raf);bubbles.forEach(b=>b.el.remove());bubbles=[]}
 function toast(html){
   const p=document.getElementById("popup");
   p.innerHTML=`<div class="sheet"><p>${html}</p><button class="btn main" type="button" onclick="document.getElementById('popup').classList.remove('show')">Ok</button></div>`;
   p.classList.add("show");
 }
 function parseHM(v,fb){if(!v||!v.includes(":"))return fb;const[h,m]=v.split(":").map(Number);return h*60+m}
-
+function bootPhysics(){
+  if(engine){ World.clear(world,false); Engine.clear(engine); }
+  engine=Engine.create({gravity:{x:0,y:0}});
+  world=engine.world;
+  const {w,h}=sizeCanvas();
+  World.add(world,[
+    Bodies.rectangle(w/2,-20,w,40,{isStatic:true}),
+    Bodies.rectangle(w/2,h+20,w,40,{isStatic:true}),
+    Bodies.rectangle(-20,h/2,40,h,{isStatic:true}),
+    Bodies.rectangle(w+20,h/2,40,h,{isStatic:true})
+  ]);
+  holdBody=Bodies.rectangle(w/2,h*0.42,Math.min(400,w-32),90,{isStatic:true,label:"hold",chamfer:{radius:16}});
+  World.add(world,holdBody);
+  balls=[];
+  Events.on(engine,"collisionStart",e=>{
+    e.pairs.forEach(pair=>{
+      const labels=[pair.bodyA.label,pair.bodyB.label];
+      if(!labels.includes("hold"))return;
+      const other=pair.bodyA.label==="hold"?pair.bodyB:pair.bodyA;
+      if(!other.plugin||!other.plugin.kind)return;
+      if(holding) Body.setVelocity(other,{x:other.velocity.x*1.35,y:other.velocity.y*1.35});
+      else if(scene==="desk"){
+        S.focus=clamp(S.focus-6,0,100); S.time+=1;
+        const t=S.tasks[S.working];
+        if(t&&t.open) t.prog=Math.max(0,t.prog-3);
+      }
+    });
+  });
+}
+function syncHold(){
+  const btn=document.getElementById("hold");
+  if(!btn||!holdBody)return;
+  const app=document.getElementById("app").getBoundingClientRect();
+  const r=btn.getBoundingClientRect();
+  Body.setPosition(holdBody,{x:r.left-app.left+r.width/2,y:r.top-app.top+r.height/2});
+}
+function spawnBall(text,kind){
+  const {w,h}=sizeCanvas();
+  const r=kind==="work"?28:22;
+  const b=Bodies.circle(40+Math.random()*(w-80),90+Math.random()*(h*0.3),r,{
+    restitution:0.92, friction:0.002, frictionAir:0.008, density:kind==="work"?0.004:0.002, label:kind
+  });
+  b.plugin={kind,text};
+  Body.setVelocity(b,{x:Math.random()*3-1.5,y:Math.random()*3-1.5});
+  World.add(world,b); balls.push(b);
+}
+function pokeBall(b){
+  if(!b.plugin)return;
+  Body.applyForce(b,b.position,{x:(Math.random()-.5)*0.08,y:(Math.random()-.5)*0.08});
+  if(b.plugin.kind==="late"){
+    S.peach++; S.time+=S.peach===1?1:Math.min(10,S.peach*2); S.focus=clamp(S.focus-5,0,100);
+    if(S.peach===1) toast("Looking at the thought is the tax. Next taps cost more.");
+  }else if(!S.off){
+    S.interrupts++; S.time+=5+Math.floor(Math.random()*8);
+    S.focus=clamp(S.focus-12,0,100); S.patience=clamp(S.patience-4,0,100);
+    addTask(b.plugin.text,"interrupt");
+  }
+  hud();
+}
+function drawWorld(){
+  const {w,h}=sizeCanvas();
+  ctx.clearRect(0,0,w,h);
+  if(scene!=="desk")return;
+  balls.forEach(b=>{
+    const k=b.plugin&&b.plugin.kind;
+    ctx.beginPath(); ctx.arc(b.position.x,b.position.y,b.circleRadius,0,Math.PI*2);
+    ctx.fillStyle=k==="work"?"rgba(20,36,34,0.92)":"rgba(40,22,22,0.92)"; ctx.fill();
+    ctx.strokeStyle=k==="work"?"rgba(126,200,192,0.75)":"rgba(232,160,122,0.75)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle=k==="work"?"#d7efea":"#f3d2c4";
+    ctx.font="11px system-ui,sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    const words=(b.plugin.text||"").split(" ");
+    ctx.fillText(words.slice(0,3).join(" "),b.position.x,b.position.y-6);
+    ctx.fillText(words.slice(3).join(" "),b.position.x,b.position.y+8);
+  });
+}
+canvas.addEventListener("pointerdown",e=>{
+  if(scene!=="desk")return;
+  const app=document.getElementById("app").getBoundingClientRect();
+  const hit=Query.point(balls,{x:e.clientX-app.left,y:e.clientY-app.top})[0];
+  if(hit) pokeBall(hit);
+});
 function show(id){
-  scene=id; clearBubbles(); holding=false;
+  scene=id; holding=false;
   const st=document.getElementById("stage");
   if(id==="setup"){
     document.getElementById("hud").hidden=true;
     st.innerHTML=`<div class="kicker">ADHD desk sim</div><h1>Static</h1>
-      <p>Not a diagnosis. A machine that charges you for switching, interrupting, and staring at the thought.</p>
+      <p>Not a diagnosis. Thoughts are bodies. They bounce. They hit the work. Looking at them costs time.</p>
       <label class="tiny">Your name</label><input id="nm" placeholder="Alex" />
       <label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher…" />
       <label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids…" />
@@ -180,7 +236,7 @@ function show(id){
       <div class="times"><input id="wk" type="time" value="06:30" /><input id="stt" type="time" value="08:00" /><input id="en" type="time" value="17:00" /></div>
       <label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" />I take stimulant meds</label>
       <button class="btn main" type="button" onclick="begin()">Start the day</button>
-      <p class="tiny">Hold the big button to work. Switching tasks costs focus. Peach thoughts cost time. Teal asks become Taskers.</p>`;
+      <p class="tiny">Hold to work. Thoughts collide. Teal asks become Taskers.</p>`;
     return;
   }
   if(id==="desk"){
@@ -188,23 +244,21 @@ function show(id){
     st.innerHTML=`<div class="kicker">${S.job} · hold to work</div><h2 id="cur">${S.important}</h2>
       <div class="prog"><i id="pfill"></i></div>
       <button id="hold" type="button">Hold to focus</button>
-      <p class="tiny">Progress only while you hold. Let go and side tasks leak. The clock does not wait.</p>
+      <p class="tiny">Hold and they glance off. Idle and they nick the bar.</p>
       <div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div>
       <button class="btn" type="button" onclick="show('end')">End the day</button>`;
-    bindHold(); renderTasks();
-    lateThoughts.sort(()=>Math.random()-.5).slice(0,6).forEach(t=>spawn(t,"late"));
-    spawn("Can you just look at this?","work");
-    spawn("Quick question. Two minutes.","work");
-    tickBubbles(); startLoop(); hud();
+    bindHold(); renderTasks(); bootPhysics();
+    lateThoughts.sort(()=>Math.random()-.5).slice(0,5).forEach(t=>spawnBall(t,"late"));
+    workAsks.slice(0,2).forEach(t=>spawnBall(t,"work"));
+    startLoop(); hud();
   }
   if(id==="end"){
-    clearBubbles();
     const main=S.tasks.find(t=>t.kind==="main");
     st.innerHTML=`<div class="kicker">After</div>
       <h2>${main&&main.prog>=100?"The thing got done. The cost is below.":"The thing did not finish. That is the usual ending."}</h2>
       <p>${S.name} did ${S.job}. ${S.home} got whoever arrived at ${mil(S.time)}.</p>
       <div class="grid"><div><b>${S.done}</b>closed</div><div><b>${S.started}</b>opened</div><div><b>${S.interrupts}</b>hallway asks</div><div><b>${S.peach}</b>thought taps</div></div>
-      <p class="tiny">Modeled: time blindness, switch cost, interrupt tax, thoughts that speed up with an open list. Not medical advice.</p>
+      <p class="tiny">Not medical advice.</p>
       <button class="btn main" type="button" onclick="show('setup')">New person</button>`;
   }
 }
@@ -219,11 +273,8 @@ function begin(){
     end:parseHM(document.getElementById("en").value,17*60),
     meds:document.getElementById("md").checked
   });
-  addTask(S.important,"main",100);
-  addTask("Inbox that will not zero","side",60);
-  addTask("Something promised yesterday","side",50);
-  S.working=0;
-  show("desk");
+  addTask(S.important,"main"); addTask("Inbox that will not zero","side"); addTask("Something promised yesterday","side");
+  S.working=0; show("desk");
 }
 function bindHold(){
   const btn=document.getElementById("hold");
@@ -237,35 +288,38 @@ function startLoop(){
   let last=performance.now();
   const step=now=>{
     const dt=Math.min(.05,(now-last)/1000); last=now;
-    if(scene!=="desk")return;
-    S.time+=dt*2.6;
-    if(S.time>=S.start+2*60) weather();
-    if(holding && S.working>=0){
-      const t=S.tasks[S.working];
-      if(t&&t.open){
-        t.prog=clamp(t.prog+(S.medOn?16:10)*(S.focus/100)*dt,0,100);
-        S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
-        S.energy=clamp(S.energy-3*dt,0,100);
-        if(t.prog>=100) closeWorking();
+    if(scene==="desk"&&engine){
+      Engine.update(engine,1000/60); syncHold();
+      const extra=S.tasks.filter(t=>t.open).length;
+      if(balls.length<5+Math.min(6,extra)&&Math.random()<0.012) spawnBall(lateThoughts[Math.floor(Math.random()*lateThoughts.length)],"late");
+      if(!S.off&&balls.filter(b=>b.plugin.kind==="work").length<2&&Math.random()<0.004) spawnBall(workAsks[Math.floor(Math.random()*workAsks.length)],"work");
+      if(S.off){ balls.filter(b=>b.plugin.kind==="work").forEach(b=>World.remove(world,b)); balls=balls.filter(b=>b.plugin.kind!=="work"); }
+      drawWorld();
+      S.time+=dt*2.6;
+      if(S.time>=S.start+2*60) weather();
+      if(holding&&S.working>=0){
+        const t=S.tasks[S.working];
+        if(t&&t.open){
+          t.prog=clamp(t.prog+(S.medOn?16:10)*(S.focus/100)*dt,0,100);
+          S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
+          S.energy=clamp(S.energy-3*dt,0,100);
+          if(t.prog>=100) closeWorking();
+        }
+      }else{
+        S.focus=clamp(S.focus-5*dt,0,100);
+        S.tasks.forEach(t=>{if(t.open&&t.kind!=="main") t.prog=Math.max(0,t.prog-1.2*dt)});
       }
-    } else {
-      S.focus=clamp(S.focus-5*dt,0,100);
-      S.tasks.forEach(t=>{if(t.open&&t.kind!=="main") t.prog=Math.max(0,t.prog-1.2*dt)});
+      if(S.time>=S.end&&!S.off){ S.off=true; toast(S.home+" is the clock now. Hallway asks clocked out."); }
+      if(S.time>=S.end+180){ show("end"); return; }
+      const t=S.tasks[S.working], fill=document.getElementById("pfill");
+      if(fill&&t) fill.style.width=t.prog+"%";
+      hud();
     }
-    if(S.time>=S.end && !S.off){
-      S.off=true;
-      bubbles.filter(b=>b.kind==="work").forEach(b=>b.el.remove());
-      bubbles=bubbles.filter(b=>b.kind!=="work");
-      toast(S.home+" is the clock now. Hallway asks have clocked out.");
-    }
-    if(S.time>=S.end+180){show("end");return}
-    const t=S.tasks[S.working], fill=document.getElementById("pfill");
-    if(fill&&t) fill.style.width=t.prog+"%";
-    hud();
     loop=requestAnimationFrame(step);
   };
   loop=requestAnimationFrame(step);
 }
+window.addEventListener("resize",()=>{ if(scene==="desk") bootPhysics(); });
 show("setup");
 </script>
 </body>
