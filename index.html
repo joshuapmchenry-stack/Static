@@ -50,10 +50,12 @@
     .bubble.home{background:rgba(36,28,18,.94);border-color:rgba(255,215,130,.5);color:#ffe7a8;width:140px}
     .bubble.boss{width:168px;min-height:92px;padding:12px;font-size:13px;font-weight:650;color:#ffe8dc;background:rgba(48,16,16,.96);border:2px solid #e8a07a;z-index:9;border-radius:40% 60% 55% 45% / 45% 40% 60% 55%;animation:bossIdle 2.4s ease-in-out infinite}
     .bubble.boss.hit{animation:bossHit .35s ease-out}
+    .bubble.boss.rage{border-width:3px;box-shadow:0 0 18px rgba(232,80,60,.45)}
     @keyframes bossIdle{0%{border-radius:40% 60% 55% 45% / 45% 40% 60% 55%}50%{border-radius:60% 40% 35% 65% / 55% 60% 40% 45%}100%{border-radius:40% 60% 55% 45% / 45% 40% 60% 55%}}
     @keyframes bossHit{0%{border-radius:50%;transform:scale(1.06)}40%{border-radius:70% 30% 65% 35% / 30% 70% 35% 65%;transform:scale(1.12)}100%{border-radius:20% 80% 30% 70% / 80% 20% 70% 30%;transform:scale(1)}}
     #shame{position:fixed;inset:0;pointer-events:none;z-index:12;transition:background .2s}
     #shame.on{background:rgba(20,8,8,.45)}
+    #shame.on.hard{background:rgba(90,8,8,.62)}
     #cur.flash{animation:steal .7s ease}
     @keyframes steal{0%{color:#ffe7a8}40%{color:#e8a07a}100%{color:var(--ink)}}
     .popup{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:30}
@@ -62,16 +64,23 @@
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
     .grid div{background:#1b2824;border-radius:12px;padding:12px;font-size:12px;color:var(--muted)}
     .grid b{display:block;color:var(--ink);font-size:20px;font-family:ui-serif,Georgia,serif}
-    .times{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     body.shake #app{animation:jolt .32s cubic-bezier(.36,.07,.19,.97)}
     body.shake-hard #app{animation:joltHard .42s cubic-bezier(.36,.07,.19,.97)}
     @keyframes jolt{0%{transform:translate3d(0,0,0)}25%{transform:translate3d(-10px,6px,0)}50%{transform:translate3d(12px,-5px,0)}75%{transform:translate3d(-6px,-8px,0)}100%{transform:translate3d(0,0,0)}}
     @keyframes joltHard{0%{transform:translate3d(0,0,0) rotate(0deg)}15%{transform:translate3d(-16px,10px,0) rotate(-1.2deg)}35%{transform:translate3d(18px,-8px,0) rotate(1.4deg)}55%{transform:translate3d(-12px,-12px,0) rotate(-0.8deg)}75%{transform:translate3d(8px,6px,0) rotate(0.6deg)}100%{transform:translate3d(0,0,0) rotate(0deg)}}
-    #shame.on.hard{background:rgba(90,8,8,.62)}
     input[type=range]{accent-color:#e8a07a}
+    #intro{position:fixed;inset:0;z-index:40;background:#0b1210;display:flex;align-items:center;justify-content:center;flex-direction:column}
+    #intro.hide{animation:introOut .6s ease forwards}
+    #intro h1{font-size:56px;letter-spacing:.08em;opacity:0;animation:titleIn 1.6s ease .2s forwards}
+    #intro .scan{width:120px;height:2px;background:#d4e07a;opacity:0;animation:scan 1.4s ease .4s forwards}
+    #intro .sub{margin-top:14px;letter-spacing:.18em;text-transform:uppercase;font-size:11px;color:var(--muted);opacity:0;animation:titleIn 1s ease 1s forwards}
+    @keyframes titleIn{0%{opacity:0;transform:translateY(10px) scale(1.04);filter:blur(8px)}60%{filter:blur(0)}100%{opacity:1;transform:none}}
+    @keyframes scan{0%{opacity:0;transform:scaleX(.2)}40%{opacity:1;transform:scaleX(1)}100%{opacity:.35;transform:scaleX(.6)}}
+    @keyframes introOut{to{opacity:0;visibility:hidden}}
   </style>
 </head>
 <body>
+<div id="intro"><h1>Static</h1><div class="scan"></div><div class="sub">tap to continue</div></div>
 <div id="app">
   <div class="hud" id="hud" hidden>
     <div class="stat"><b id="clock">????</b>Energy<div class="bar e"><i id="eBar"></i></div></div>
@@ -85,7 +94,7 @@
 <div class="popup" id="popup"></div>
 <div id="bubbles"></div>
 <script>
-const KEY="static-save-v1";
+const KEY="static-save-v2";
 const OPT="static-opt-v1";
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 let OPTS={sfx:1,vol:0.7,music:1,haptic:1,shake:1};
@@ -125,24 +134,34 @@ function jolt(hard){
     document.body.classList.add(hard?"shake-hard":"shake");
     setTimeout(function(){document.body.classList.remove("shake","shake-hard")},450);
   }
-  buzz(hard?[50,40,90,40,50]:[22]);
+  buzz(hard?[50,40,90,40,50]:[18,24,18]);
 }
 function sfx(kind){
   armAudio();
-  if(kind==="sting"){tone(880,0.09,"square",0.22,140);noise(0.06,0.18);jolt(false)}
-  if(kind==="boss"){tone(180,0.22,"sawtooth",0.38,70);tone(720,0.12,"square",0.2,200);noise(0.18,0.32);jolt(true)}
-  if(kind==="shame"){tone(90,0.35,"triangle",0.4,50);noise(0.22,0.28);jolt(true)}
-  if(kind==="wave"){tone(520,0.08,"square",0.16,900);setTimeout(function(){tone(640,0.07,"square",0.14,1100)},70);setTimeout(function(){tone(780,0.06,"square",0.12,1300)},140);jolt(false)}
-  if(kind==="steal"){tone(240,0.14,"sawtooth",0.2,90);jolt(false)}
+  if(kind==="sting"){tone(880,0.09,"square",0.22,140);noise(0.06,0.18);jolt(false);buzz([16,20,16])}
+  if(kind==="boss"){tone(180,0.22,"sawtooth",0.38,70);tone(720,0.12,"square",0.2,200);noise(0.18,0.32);jolt(true);buzz([40,30,80,30,40,20,60])}
+  if(kind==="shame"){tone(90,0.35,"triangle",0.4,50);noise(0.22,0.28);jolt(true);buzz([70,40,90])}
+  if(kind==="wave"){tone(520,0.08,"square",0.16,900);setTimeout(function(){tone(640,0.07,"square",0.14,1100)},70);setTimeout(function(){tone(780,0.06,"square",0.12,1300)},140);jolt(false);buzz([12,18,12,18,12])}
+  if(kind==="steal"){tone(240,0.14,"sawtooth",0.2,90);jolt(false);buzz([22])}
   if(kind==="home"){tone(330,0.16,"triangle",0.18,220);buzz([18,30,18])}
 }
 
-let MUS={on:false,t:0,mode:"desk",timer:0};
+const MAJOR=[0,2,4,7,9,12,16];
+const MINOR=[0,1,3,6,7,10,13];
+let MUS={on:false,t:0,mode:"menu",timer:0};
+function band(){return S?Math.floor((Math.max(1,S.day)-1)/10):0}
 function chaosScore(){
   if(!S)return 0;
   const tasks=S.tasks.filter(function(x){return x.open}).length;
   const late=bubbles.filter(function(b){return b.kind==="late"}).length;
-  return clamp(tasks*0.12+late*0.08+(S.boss?0.45:0),0,1);
+  const raw=tasks*0.11+late*0.09+(S.boss?0.4:0);
+  const unlock=clamp((S.day-1)/10,0,1);
+  return clamp(raw*unlock,0,1);
+}
+function panicOn(){
+  if(!S)return false;
+  if(S.day<4)return false;
+  return S.peach>=10;
 }
 function note(freq,dur,type,gain){
   if(!OPTS.music||!AC)return;
@@ -156,19 +175,27 @@ function note(freq,dur,type,gain){
 }
 function musicTick(){
   if(!MUS.on||!AC||!OPTS.music)return;
-  const c=chaosScore();
+  const menu=MUS.mode==="menu";
   const boss=MUS.mode==="boss"||!!(S&&S.boss);
-  const bpm=boss?148+c*50:72+c*110;
+  const panic=panicOn();
+  const c=chaosScore();
+  let bpm,root,scale,wave;
+  if(menu){bpm=85;root=130.81;scale=MAJOR;wave="triangle"}
+  else if(boss){bpm=132+c*40+band()*8;root=55;scale=MINOR;wave="sawtooth"}
+  else if(panic){bpm=128+c*70+band()*10;root=73.42;scale=MINOR;wave="sawtooth"}
+  else {bpm=78+c*36+band()*6;root=82.41;scale=MAJOR;wave="triangle"}
   const step=60/bpm;
-  const root=boss?55:82;
-  const scale=boss?[0,1,3,6,7,10,13]:[0,3,5,7,10,12,15];
   MUS.t++;
   const deg=scale[MUS.t%scale.length];
-  note(root*Math.pow(2,deg/12),step*(boss?0.55:0.7),boss?"sawtooth":"triangle",boss?0.22:0.1+c*0.12);
-  if(c>0.28)note(root*Math.pow(2,(deg+7)/12),step*0.35,boss?"square":"sine",0.06+c*0.1);
-  if(c>0.55)note(root*2*Math.pow(2,(scale[(MUS.t*3)%scale.length])/12),step*0.2,"square",0.05+c*0.08);
-  if(c>0.75)noise(0.04,0.08+c*0.08);
-  if(OPTS.haptic&&c>0.6&&MUS.t%4===0)buzz(boss?[18,40,30]:[12]);
+  note(root*Math.pow(2,deg/12),step*(boss||panic?0.5:0.72),wave,boss?0.22:0.1+c*0.12);
+  if(!menu&&c>0.22)note(root*Math.pow(2,(deg+7)/12),step*0.32,panic?"square":"sine",0.05+c*0.1);
+  if(!menu&&c>0.5)note(root*2*Math.pow(2,(scale[(MUS.t*3)%scale.length])/12),step*0.18,"square",0.04+c*0.08);
+  if(!menu&&(panic||c>0.72))noise(0.04,0.07+c*0.08);
+  if(!menu&&OPTS.haptic){
+    if(boss&&MUS.t%3===0)buzz([16,28,16]);
+    else if(panic&&MUS.t%2===0)buzz([10,16,10]);
+    else if(c>0.55&&MUS.t%4===0)buzz([12]);
+  }
   MUS.timer=setTimeout(musicTick,step*1000);
 }
 function startMusic(mode){
@@ -177,12 +204,7 @@ function startMusic(mode){
   clearTimeout(MUS.timer);
   if(MUS.on)musicTick();
 }
-function stopMusic(){
-  MUS.on=false;clearTimeout(MUS.timer);
-}
-function setMusicMode(mode){
-  MUS.mode=mode;
-}
+function stopMusic(){MUS.on=false;clearTimeout(MUS.timer)}
 
 const clockTxt=m=>{
   const x=((Math.floor(m)%1440)+1440)%1440;
@@ -190,48 +212,43 @@ const clockTxt=m=>{
   h=h%12;if(!h)h=12;
   return h+":"+String(min).padStart(2,"0")+" "+ap;
 };
-const lateThoughts=["Already behind.","Don't look.","Look at the clock.","They think you don't care.","Just start.","This should be easy.","You'll stay late.","One more minute.","You forgot something.","Why is this hard."];
-const workAsks=["Can you just…","Two minutes.","Forwarding this.","Got a sec?"];
-const bossLines=["Status on the main thing.","I asked about this.","Even if it's done I need it again.","Why isn't this closed.","Walk me through it. Now."];
+const lateThoughts=["Already behind.","Don't look.","Look at the clock.","They think you don't care.","Just start.","This should be easy.","You'll stay late.","One more minute.","You forgot something.","Why is this hard.","Reply. Don't reply.","Was that today?","Check it again.","If you sit still it gets worse."];
+const workAsks=["Can you just look at this?","Two minutes. Promise.","Forwarding this to you.","Got a sec?","Print this real quick.","The thing isn't loading.","Can you reserve the room?","Need this hung up."];
+const bossLines=["Status on the main thing.","I asked about this.","Even if it's done I need it again.","Why isn't this closed.","Walk me through it. Now.","Put it on my desk.","Same results as last time."];
+const rageLines=["I needed this yesterday.","Do not tell me it's almost done.","Fifteen reasons this is still open.","Everyone is waiting on you.","Fix it. Then explain why it broke."];
 const homeLines=["You leaving?","Still there?","Dinner's ready.","Can you pick up."];
-const extras=["Email you said you'd send.","Form from last week.","That thing in drafts.","Calendar hold you never booked."];
-let S,loop=0,holding=false,bubbles=[],raf=0,scene="setup",glance=true;
+const MAIN="The one thing that actually matters";
+const SIDES=["Inbox that will not zero","Something promised yesterday"];
+
+let S,loop=0,holding=false,bubbles=[],raf=0,scene="intro",glance=true;
 const clockEl=document.getElementById("clock"),eBar=document.getElementById("eBar"),fBar=document.getElementById("fBar"),pBar=document.getElementById("pBar"),med=document.getElementById("med");
 clockEl.onclick=()=>{if(!S||scene!=="desk")return;glance=true;clockEl.textContent=clockTxt(S.time);S.focus=clamp(S.focus-2,0,100)};
 
-function blankMeta(){
-  return {name:"You",job:"work",home:"someone at home",start:9*60,end:17*60,meds:false,day:1,spoons:0,focusBoost:0,slowClock:0};
-}
+function angryDay(d){return d>0&&d%10===0}
+function juiceMul(){return clamp(1.9-band()*0.28,0.7,2)}
 function loadSave(){try{return JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){return null}}
 function persist(){
   if(!S)return;
   const pack={
-    meta:{name:S.name,job:S.job,home:S.home,start:S.start,end:S.end,meds:S.meds,day:S.day,spoons:S.spoons,focusBoost:S.focusBoost,slowClock:S.slowClock},
-    coffee:S.coffee,pills:S.pills,energy:S.energy,patience:S.patience,
-    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open})),
-    important:S.important
+    meta:{day:S.day,spoons:S.spoons,focusBoost:S.focusBoost,slowClock:S.slowClock,shopCoffee:S.shopCoffee||0,shopPills:S.shopPills||0},
+    energy:S.energy,patience:S.patience,
+    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open}))
   };
   localStorage.setItem(KEY,JSON.stringify(pack));
 }
 function wipe(){localStorage.removeItem(KEY)}
-
-function freshFromForm(form,carry){
-  const meta=carry&&carry.meta?carry.meta:blankMeta();
-  const name=form&&form.name||meta.name;
-  const job=form&&form.job||meta.job;
-  const home=form&&form.home||meta.home;
-  const start=form&&form.start!=null?form.start:meta.start;
-  const end=form&&form.end!=null?form.end:meta.end;
-  const meds=form&&form.meds!=null?!!form.meds:!!meta.meds;
+function freshDay(carry){
+  const meta=carry&&carry.meta?carry.meta:{day:1,spoons:0,focusBoost:0,slowClock:0,shopCoffee:0,shopPills:0};
   const leftover=(carry&&carry.tasks||[]).filter(t=>t.open).map(t=>({title:t.title,kind:t.kind==="main"?"side":t.kind,prog:Math.max(0,(t.prog||0)*0.85),open:true,hidden:false}));
-  const important=form&&form.important||("Day "+(meta.day||1)+" — the one thing");
   return {
-    name,job,home,start,end,important,meds,medOn:!!meds,
+    start:9*60,end:17*60,important:MAIN,meds:true,medOn:true,
     day:meta.day||1,spoons:meta.spoons||0,focusBoost:meta.focusBoost||0,slowClock:meta.slowClock||0,
-    time:start-30,energy:carry?clamp((carry.energy||50)+18,28,78):58,focus:32,patience:carry?clamp((carry.patience||70)+12,35,85):70,
+    shopCoffee:0,shopPills:0,
+    time:9*60-30,energy:carry?clamp((carry.energy||50)+18,28,78):62,focus:38,patience:carry?clamp((carry.patience||70)+12,35,85):74,
     peach:0,interrupts:0,started:0,done:0,working:0,tasks:[],off:false,
-    coffee:carry&&carry.coffee!=null?carry.coffee:2,pills:carry&&carry.pills!=null?carry.pills:(meds?1:0),
-    lockUntil:0,holdSecs:0,waveT:16,boss:null,bossLeft:2,nextBoss:28,vanish:null,shameT:34,switchT:20,
+    coffee:2+(meta.shopCoffee||0),pills:1+(meta.shopPills||0),
+    lockUntil:0,holdSecs:0,waveT:18+band()*2,boss:null,bossLeft:angryDay(meta.day||1)?1:2,nextBoss:angryDay(meta.day||1)?18:32+Math.max(0,8-band()*2),
+    vanish:null,shameT:40+Math.max(0,20-band()*4),switchT:26+Math.max(0,16-band()*4),
     stuck:[],weather:"clear",heldLong:0,leftover:leftover
   };
 }
@@ -239,10 +256,10 @@ function hud(){
   if(document.getElementById("hud").hidden)return;
   clockEl.textContent=glance?clockTxt(S.time):"????";
   eBar.style.width=S.energy+"%"; fBar.style.width=S.focus+"%"; pBar.style.width=S.patience+"%";
-  med.textContent="Day "+S.day+" · "+S.spoons+" spoons · "+(S.meds?(S.medOn?"meds: holding":"meds: crashed"):"meds: none");
+  const pan=panicOn()?" · panic":"";
+  med.textContent="Day "+S.day+" · band "+(band()+1)+" · "+S.spoons+" spoons · meds "+(S.medOn?"on":"crash")+pan;
 }
 function weather(){
-  if(!S.meds){S.medOn=false;return}
   if(S.time>=S.start+6*60) S.medOn=Math.random()>0.7;
   else if(S.time>=S.start+2*60) S.medOn=Math.random()>0.45;
   else S.medOn=true;
@@ -259,7 +276,7 @@ function renderTasks(){
   box.innerHTML=rows.map(t=>{
     const i=S.tasks.indexOf(t);
     return '<div class="task '+(t.kind==="main"?"main":"")+'"><span>'+t.title+'<div class="tiny">'+Math.floor(t.prog)+"% · "+(t.kind==="main"?"THE thing":t.kind)+(S.stuck.indexOf(i)>=0?" · stuck":"")+'</div></span><button type="button" onclick="pickTask('+i+')">'+(S.working===i?"Current":"Work")+"</button></div>";
-  }).join("")||'<div class="tiny">No open Taskers. (or they slipped)</div>';
+  }).join("")||'<div class="tiny">No open Taskers.</div>';
 }
 function pickTask(i){
   if(!S.tasks[i]||S.tasks[i].hidden)return;
@@ -284,8 +301,10 @@ function spawn(text,kind){
   if(!layer)return;
   const el=document.createElement("button");
   el.type="button";
-  el.className="bubble"+(kind==="work"?" work":kind==="home"?" home":kind==="boss"?" boss":"");
-  el.textContent=kind==="boss"?text+"  ·  6 taps":text;
+  const rage=kind==="boss"&&S&&S.boss&&S.boss.rage;
+  el.className="bubble"+(kind==="work"?" work":kind==="home"?" home":kind==="boss"?" boss":"")+(rage?" rage":"");
+  const need=S&&S.boss?S.boss.need:6;
+  el.textContent=kind==="boss"?text+"  ·  "+need+" taps":text;
   layer.appendChild(el);
   const w=kind==="boss"?168:kind==="home"?140:120;
   const b={el,kind,text,x:10+Math.random()*Math.max(20,host.width-w-20),y:kind==="boss"?160:90+Math.random()*Math.max(60,host.height-240),vx:(0.7+Math.random())*(Math.random()>.5?1:-1),vy:(0.7+Math.random())*(Math.random()>.5?1:-1)};
@@ -301,11 +320,18 @@ function spawn(text,kind){
       if(S.boss.hits>=S.boss.need){el.remove();bubbles=bubbles.filter(x=>x!==b);S.boss=null;S.weather="clear";lockHold();toast("They're gone. For now.");startMusic("desk")}
       hud();return;
     }
-    if(kind==="late"){sfx("sting");S.peach++;S.time+=S.peach===1?1:Math.min(10,S.peach*2);S.focus=clamp(S.focus-5,0,100);holding=false;if(S.peach===1)toast("Looking at the thought is the tax.")}
+    if(kind==="late"){sfx("sting");S.peach++;S.time+=S.peach===1?1:Math.min(8,S.peach);S.focus=clamp(S.focus-5,0,100);holding=false;if(S.peach===10&&S.day>=4)toast("The key dropped. Heart rate didn't.")}
     else if(kind==="home"){sfx("home");S.time+=4;S.patience=clamp(S.patience-6,0,100);holding=false}
     else if(!S.off){sfx("sting");S.interrupts++;S.time+=5+Math.floor(Math.random()*8);S.focus=clamp(S.focus-12,0,100);S.patience=clamp(S.patience-4,0,100);addTask(text,"interrupt");holding=false}
     el.remove();bubbles=bubbles.filter(x=>x!==b);
-    setTimeout(function(){if(scene==="desk"&&kind!=="boss"&&!(kind==="work"&&S.off)&&kind!=="home")spawn(text,kind)},kind==="work"?16000:900);
+    const lateCap=2+band()*2;
+    const lateNow=bubbles.filter(function(x){return x.kind==="late"}).length;
+    setTimeout(function(){
+      if(scene!=="desk"||kind==="boss"||kind==="home")return;
+      if(kind==="work"&&S.off)return;
+      if(kind==="late"&&lateNow>=lateCap)return;
+      spawn(text,kind);
+    },kind==="work"?16000:900);
     hud();
   };
   bubbles.push(b);if(kind==="boss")lockHold();
@@ -313,8 +339,8 @@ function spawn(text,kind){
 function tickBubbles(){
   const host=document.getElementById("app").getBoundingClientRect();
   const extra=S?S.tasks.filter(t=>t.open).length:0;
-  const crash=S&&S.meds&&!S.medOn?1.35:1;
-  const sp=(1.2+extra*0.2)*crash;
+  const crash=S&&!S.medOn?1.2+band()*0.08:1;
+  const sp=(1+extra*0.12+band()*0.12)*crash;
   bubbles.forEach(b=>{
     const m=b.kind==="late"?sp:b.kind==="boss"?0.85:1;
     b.x+=b.vx*m;b.y+=b.vy*m;
@@ -329,13 +355,29 @@ function tickBubbles(){
 }
 function clearBubbles(){cancelAnimationFrame(raf);raf=0;bubbles.forEach(b=>b.el.remove());bubbles=[]}
 function toast(html){const p=document.getElementById("popup");p.innerHTML='<div class="sheet"><p>'+html+'</p><button class="btn main" type="button" onclick="document.getElementById(\'popup\').classList.remove(\'show\')">Ok</button></div>';p.classList.add("show")}
-function parseHM(v,fb){if(!v||!v.includes(":"))return fb;const p=v.split(":");return (+p[0])*60+(+p[1])}
 function lockHold(){const btn=document.getElementById("hold");if(!btn)return;const blocked=!!(S&&S.boss)||performance.now()<(S&&S.lockUntil||0);btn.disabled=blocked;btn.classList.toggle("locked",blocked);btn.textContent=S&&S.boss?"Deal with them first":(blocked?"Stuck on this":"Hold to focus")}
 function sip(){if(!S||S.coffee<=0)return;S.coffee--;S.energy=clamp(S.energy+28,0,100);S.focus=clamp(S.focus+6,0,100);persist();toast("Coffee. Tasks will move until it doesn't.")}
-function pill(){if(!S||!S.meds||S.pills<=0)return;S.pills--;S.medOn=true;S.energy=clamp(S.energy+18,0,100);S.focus=clamp(S.focus+10,0,100);persist();toast("Onboard. Weather still changes later.")}
-function wave(){if(scene!=="desk")return;sfx("wave");const n=3+Math.min(6,S.tasks.filter(t=>t.open).length);for(let i=0;i<n;i++)setTimeout(function(){if(scene==="desk")spawn(lateThoughts[Math.floor(Math.random()*lateThoughts.length)],"late")},i*90)}
-function callBoss(){if(S.boss||S.bossLeft<=0||scene!=="desk")return;S.bossLeft--;S.boss={hits:0,need:6};S.weather="boss";sfx("boss");startMusic("boss");spawn(bossLines[Math.floor(Math.random()*bossLines.length)],"boss");S.patience=clamp(S.patience-8,0,100);holding=false;lockHold()}
-
+function pill(){if(!S||S.pills<=0)return;S.pills--;S.medOn=true;S.energy=clamp(S.energy+18,0,100);S.focus=clamp(S.focus+10,0,100);persist();toast("Onboard. Weather still changes later.")}
+function wave(){
+  if(scene!=="desk"||S.day<3)return;
+  sfx("wave");
+  const n=2+Math.min(3+band(),S.tasks.filter(t=>t.open).length);
+  for(let i=0;i<n;i++)setTimeout(function(){if(scene==="desk")spawn(lateThoughts[Math.floor(Math.random()*lateThoughts.length)],"late")},i*90);
+}
+function callBoss(){
+  if(S.boss||S.bossLeft<=0||scene!=="desk")return;
+  if(S.day<3&&!angryDay(S.day))return;
+  S.bossLeft--;
+  const rage=angryDay(S.day);
+  S.boss={hits:0,need:rage?15:6,rage:rage};
+  S.weather="boss";
+  sfx("boss");startMusic("boss");
+  const pool=rage?rageLines:bossLines;
+  spawn(pool[Math.floor(Math.random()*pool.length)],"boss");
+  S.patience=clamp(S.patience-(rage?14:8),0,100);
+  holding=false;lockHold();
+  if(rage)toast("Review day. They brought the whole list.");
+}
 function payout(){
   const main=S.tasks.find(t=>t.kind==="main");
   let n=2+S.done;
@@ -349,8 +391,8 @@ function payout(){
 function buy(what){
   const cost={coffee:2,meds:3,focus:3,slow:3}[what];
   if(S.spoons<cost){toast("Not enough spoons.");return}
-  if(what==="coffee"){S.coffee+=2;S.spoons-=2}
-  if(what==="meds"){if(!S.meds){toast("You didn't check meds.");return}S.pills+=1;S.spoons-=3}
+  if(what==="coffee"){S.shopCoffee=(S.shopCoffee||0)+2;S.spoons-=2;toast("+2 coffee waiting on the next desk.")}
+  if(what==="meds"){S.shopPills=(S.shopPills||0)+1;S.spoons-=3;toast("+1 dose waiting on the next desk.")}
   if(what==="focus"){S.focusBoost=1;S.spoons-=3}
   if(what==="slow"){S.slowClock=1;S.spoons-=3}
   persist();show("shop");
@@ -363,117 +405,87 @@ function show(id){
   if(id==="menu"){
     document.getElementById("hud").hidden=true;
     const d=save&&save.meta?save.meta:null;
-    st.innerHTML='<div class="kicker">ADHD desk sim</div><h1>Static</h1><p>The pile does not reset. Sounds are meant to startle.</p>'+
-      '<button class="btn main" type="button" onclick="armAudio();show(\'setup\')">Start</button>'+
-      '<button class="btn" type="button" '+(d?'':'disabled')+' onclick="armAudio();show(\'load\')">Load</button>'+
+    st.innerHTML='<div class="kicker">ADHD desk sim</div><h1>Static</h1><p>Nine to five. Same desk. The pile does not reset. Days 1–10 are kind. After that, they are not.</p>'+
+      '<button class="btn main" type="button" onclick="armAudio();beginNew()">Start</button>'+
       '<button class="btn" type="button" '+(d?'':'disabled')+' onclick="armAudio();continueLife()">Continue'+(d?' · Day '+d.day:'')+'</button>'+
       '<button class="btn" type="button" onclick="armAudio();show(\'settings\')">Settings</button>'+
+      (d?'<button class="btn" type="button" onclick="wipe();show(\'menu\')">Erase save</button>':'')+
       '<p class="tiny">First tap unlocks audio. Saved on this phone only.</p>';
-    return;
-  }
-  if(id==="load"){
-    document.getElementById("hud").hidden=true;
-    if(!save){show("menu");return}
-    const m=save.meta;
-    st.innerHTML='<div class="kicker">Load</div><h2>'+(m.name||"You")+'</h2><p>'+(m.job||"work")+' · Day '+m.day+' · '+(m.spoons||0)+' spoons</p><p class="tiny">'+(save.tasks||[]).filter(function(t){return t.open}).length+' Taskers still open. Waiting: '+(m.home||"—")+'</p><button class="btn main" type="button" onclick="armAudio();continueLife()">Play this life</button><button class="btn" type="button" onclick="show(\'menu\')">Back</button>';
+    startMusic("menu");
     return;
   }
   if(id==="settings"){
     document.getElementById("hud").hidden=true;
     st.innerHTML='<div class="kicker">Settings</div><h2>How loud the brain gets</h2>'+
       '<label class="tiny"><input type="checkbox" id="optSfx" style="width:auto;display:inline;margin-right:8px" '+(OPTS.sfx?"checked":"")+' />Sound effects</label>'+
-      '<label class="tiny"><input type="checkbox" id="optMus" style="width:auto;display:inline;margin-right:8px" '+(OPTS.music?"checked":"")+' />Background music</label>'+
-      '<label class="tiny"><input type="checkbox" id="optHap" style="width:auto;display:inline;margin-right:8px" '+(OPTS.haptic?"checked":"")+' />Phone haptics</label>'+
+      '<label class="tiny"><input type="checkbox" id="optMus" style="width:auto;display:inline;margin-right:8px" '+(OPTS.music?"checked":"")+' />Music</label>'+
+      '<label class="tiny"><input type="checkbox" id="optHap" style="width:auto;display:inline;margin-right:8px" '+(OPTS.haptic?"checked":"")+' />Haptics</label>'+
       '<label class="tiny">Volume</label><input id="optVol" type="range" min="0" max="1" step="0.05" value="'+OPTS.vol+'" />'+
       '<label class="tiny"><input type="checkbox" id="optShake" style="width:auto;display:inline;margin-right:8px" '+(OPTS.shake?"checked":"")+' />Screen jolt</label>'+
       '<button class="btn" type="button" onclick="armAudio();sfx(\'boss\');startMusic(\'boss\')">Test fight-or-flight</button>'+
       '<button class="btn main" type="button" onclick="applySettings()">Save settings</button>'+
       '<button class="btn" type="button" onclick="show(\'menu\')">Back</button>';
-    return;
-  }
-  if(id==="setup"){
-    document.getElementById("hud").hidden=true;
-    st.innerHTML='<div class="kicker">New life</div><h1>Who is at the desk</h1>'+
-      '<label class="tiny">Your name</label><input id="nm" placeholder="Alex" value="'+(save&&save.meta&&save.meta.name||"")+'" /><label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher" value="'+(save&&save.meta&&save.meta.job||"")+'" /><label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids" value="'+(save&&save.meta&&save.meta.home||"")+'" /><label class="tiny">Today\'s one thing</label><input id="imp" placeholder="Finish the report" /><label class="tiny">Start · end</label><div class="times"><input id="stt" type="time" value="09:00" /><input id="en" type="time" value="17:00" /></div><label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" '+(save&&save.meta&&save.meta.meds?"checked":"")+' />I take stimulant meds</label><button class="btn main" type="button" onclick="armAudio();beginNew()">Clock in</button>'+(save?'<button class="btn" type="button" onclick="wipe();show(\'menu\')">Erase saved life</button>':'')+
-      '<button class="btn" type="button" onclick="show(\'menu\')">Back</button>';
+    startMusic("menu");
     return;
   }
   if(id==="shop"){
     document.getElementById("hud").hidden=true;
     const open=S.tasks.filter(t=>t.open).length;
-    st.innerHTML='<div class="kicker">Night market</div><h2>Day '+S.day+' closed</h2><p>'+S.spoons+' spoons in the jar. '+open+' Taskers still on the desk.</p><div class="card"><div class="kicker">Spend</div><button class="btn" type="button" onclick="buy(\'coffee\')">Coffee +2 uses · 2 spoons</button><button class="btn" type="button" onclick="buy(\'meds\')" '+(S.meds?"":"disabled")+'>Meds +1 dose · 3 spoons</button><button class="btn" type="button" onclick="buy(\'focus\')">Tomorrow focuses faster · 3 spoons '+(S.focusBoost?"(on)":"")+'</button><button class="btn" type="button" onclick="buy(\'slow\')">Tomorrow the clock is kinder · 3 spoons '+(S.slowClock?"(on)":"")+'</button></div><button class="btn main" type="button" onclick="tomorrow()">Sleep. Day '+(S.day+1)+'.</button><button class="btn" type="button" onclick="persist();show(\'menu\')">Quit to menu</button>';
+    st.innerHTML='<div class="kicker">Night market</div><h2>Day '+S.day+' closed</h2><p>'+S.spoons+' spoons. '+open+' Taskers carried. Tomorrow starts with 2 coffee and 1 med, plus whatever you buy here.</p><div class="card"><div class="kicker">Spend</div><button class="btn" type="button" onclick="buy(\'coffee\')">Extra coffee +2 tomorrow · 2 spoons</button><button class="btn" type="button" onclick="buy(\'meds\')">Extra meds +1 tomorrow · 3 spoons</button><button class="btn" type="button" onclick="buy(\'focus\')">Tomorrow focuses faster · 3 spoons '+(S.focusBoost?"(on)":"")+'</button><button class="btn" type="button" onclick="buy(\'slow\')">Tomorrow the clock is kinder · 3 spoons '+(S.slowClock?"(on)":"")+'</button></div><button class="btn main" type="button" onclick="tomorrow()">Sleep. Day '+(S.day+1)+'.</button><button class="btn" type="button" onclick="persist();show(\'menu\')">Menu</button>';
+    startMusic("menu");
     return;
   }
   if(id==="desk"){
     document.getElementById("hud").hidden=false;
-    st.innerHTML='<div class="kicker">'+S.job+' · day '+S.day+'</div><h2 id="cur">'+S.important+'</h2><div class="prog"><i id="pfill"></i></div><button id="hold" type="button">Hold to focus</button><div class="row"><button class="btn" type="button" id="coffeeBtn">Coffee</button><button class="btn" type="button" id="medBtn">Meds</button></div><p class="tiny">Morning is slow on purpose. The pile from yesterday is still here.</p><div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div><button class="btn" type="button" onclick="endNow()">End the day</button><button class="btn" type="button" onclick="persist();show(\'menu\')">Menu</button>';
+    st.innerHTML='<div class="kicker">Day '+S.day+' · 9 to 5 · band '+(band()+1)+'</div><h2 id="cur">'+S.important+'</h2><div class="prog"><i id="pfill"></i></div><button id="hold" type="button">Hold to focus</button><div class="row"><button class="btn" type="button" id="coffeeBtn">Coffee</button><button class="btn" type="button" id="medBtn">Meds</button></div><p class="tiny">'+(angryDay(S.day)?"Review day. They will not be reasonable.":"Same desk. Same list. Hold to move it.")+'</p><div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div><button class="btn" type="button" onclick="endNow()">End the day</button><button class="btn" type="button" onclick="persist();show(\'menu\')">Menu</button>';
     document.getElementById("coffeeBtn").onclick=sip;
     document.getElementById("medBtn").onclick=pill;
-    if(!S.meds)document.getElementById("medBtn").disabled=true;
     bindHold();renderTasks();
-    lateThoughts.sort(function(){return Math.random()-.5}).slice(0,5).forEach(function(t){spawn(t,"late")});
-    workAsks.slice(0,2).forEach(function(t){spawn(t,"work")});
-    tickBubbles();startLoop();hud();lockHold();startMusic((S&&S.boss)?"boss":"desk");
+    const lateStart=S.day===1?2:S.day<5?3:4;
+    lateThoughts.sort(function(){return Math.random()-.5}).slice(0,lateStart).forEach(function(t){spawn(t,"late")});
+    if(S.day>=2)workAsks.slice(0,S.day>=10?3:2).forEach(function(t){spawn(t,"work")});
+    tickBubbles();startLoop();hud();lockHold();startMusic("desk");
     return;
   }
   if(id==="end"){
     document.getElementById("hud").hidden=true;
     const main=S.tasks.find(t=>t.kind==="main");
     const got=payout();
-    S.focusBoost=0;S.slowClock=0;
     persist();
-    st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?'The thing got done. The pile may not have.':'The thing did not finish. It will be here in the morning.')+'</h2><p>'+S.name+' clocked out at '+clockTxt(S.time)+'. '+S.home+' got whoever arrived.</p><div class="grid"><div><b>'+S.done+'</b>closed</div><div><b>'+S.tasks.filter(function(t){return t.open}).length+'</b>carried</div><div><b>'+got+'</b>spoons today</div><div><b>'+S.spoons+'</b>in the jar</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'shop\')">Spend spoons</button>';
+    st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?'The thing got done. The pile may not have.':'The thing did not finish. It will be here in the morning.')+'</h2><p>Clocked out at '+clockTxt(S.time)+'.</p><div class="grid"><div><b>'+S.done+'</b>closed</div><div><b>'+S.tasks.filter(function(t){return t.open}).length+'</b>carried</div><div><b>'+got+'</b>spoons today</div><div><b>'+S.spoons+'</b>in the jar</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'shop\')">Spend spoons</button>';
+    startMusic("menu");
   }
 }
 function seedDay(){
-  addTask(S.important,"main",0);
+  addTask(MAIN,"main",0);
   (S.leftover||[]).forEach(t=>addTask(t.title,t.kind==="main"?"side":t.kind,t.prog));
-  if(!(S.leftover&&S.leftover.length)){
-    addTask("Inbox that will not zero","side",0);
-    addTask("Something promised yesterday","side",0);
-  }else if(Math.random()>0.35){
-    addTask(extras[Math.floor(Math.random()*extras.length)],"side",0);
-  }
+  SIDES.forEach(function(title){
+    if(!S.tasks.some(function(t){return t.title===title}))addTask(title,"side",0);
+  });
   S.working=0;
 }
 function beginNew(){
   wipe();
-  S=freshFromForm({
-    name:document.getElementById("nm").value.trim(),
-    job:document.getElementById("jb").value.trim(),
-    home:document.getElementById("hm").value.trim(),
-    important:document.getElementById("imp").value.trim()||"The one thing that actually matters",
-    start:parseHM(document.getElementById("stt").value,9*60),
-    end:parseHM(document.getElementById("en").value,17*60),
-    meds:document.getElementById("md").checked
-  },null);
-  S.day=1;S.spoons=0;S.focusBoost=0;S.slowClock=0;
+  S=freshDay(null);
+  S.day=1;S.spoons=0;S.focusBoost=0;S.slowClock=0;S.shopCoffee=0;S.shopPills=0;
   seedDay();glance=false;persist();show("desk");
 }
 function continueLife(){
   const save=loadSave();
   if(!save){show("menu");return}
-  const impEl=document.getElementById("imp");
-  S=freshFromForm({
-    name:(document.getElementById("nm")&&document.getElementById("nm").value.trim())||save.meta.name,
-    job:(document.getElementById("jb")&&document.getElementById("jb").value.trim())||save.meta.job,
-    home:(document.getElementById("hm")&&document.getElementById("hm").value.trim())||save.meta.home,
-    important:(impEl&&impEl.value.trim())||("Day "+save.meta.day+" — the one thing"),
-    start:save.meta.start,end:save.meta.end,meds:save.meta.meds
-  },save);
+  S=freshDay(save);
   seedDay();glance=false;persist();show("desk");
 }
 function tomorrow(){
-  const d=S.day+1,fb=S.focusBoost,sc=S.slowClock,sp=S.spoons,cf=S.coffee,pi=S.pills;
+  const d=S.day+1,fb=S.focusBoost,sc=S.slowClock,sp=S.spoons;
   const save={
-    meta:{name:S.name,job:S.job,home:S.home,start:S.start,end:S.end,meds:S.meds,day:d,spoons:sp,focusBoost:fb,slowClock:sc},
-    coffee:cf,pills:pi,energy:S.energy,patience:S.patience,
-    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open})),
-    important:"Day "+d+" — the one thing"
+    meta:{day:d,spoons:sp,focusBoost:fb,slowClock:sc,shopCoffee:S.shopCoffee||0,shopPills:S.shopPills||0},
+    energy:S.energy,patience:S.patience,
+    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open}))
   };
   localStorage.setItem(KEY,JSON.stringify(save));
-  S=freshFromForm({name:S.name,job:S.job,home:S.home,important:"Day "+d+" — the one thing",start:S.start,end:S.end,meds:S.meds},save);
-  S.day=d;S.spoons=sp;S.coffee=cf;S.pills=pi;S.focusBoost=fb;S.slowClock=sc;
+  S=freshDay(save);
+  S.focusBoost=fb;S.slowClock=sc;
   seedDay();glance=false;persist();show("desk");
 }
 function applySettings(){
@@ -501,33 +513,33 @@ function startLoop(){
     S.time+=dt*speed;
     S.waveT-=dt;S.shameT-=dt;S.switchT-=dt;S.nextBoss-=dt;
     if(S.time>=S.start+2*60)weather();
-    if(S.weather==="clear"&&S.waveT<=0){wave();S.weather="wave";setTimeout(function(){if(S.weather==="wave")S.weather="clear"},4000);S.waveT=22+Math.random()*10}
-    if(S.weather==="clear"&&S.shameT<=0){const sh=document.getElementById("shame");sh.classList.add("on","hard");sfx("shame");holding=false;S.weather="shame";S.focus=clamp(S.focus-8,0,100);S.patience=clamp(S.patience-5,0,100);setTimeout(function(){sh.classList.remove("on","hard");if(S.weather==="shame")S.weather="clear"},900);S.shameT=36+Math.random()*18}
-    if(S.weather==="clear"&&S.switchT<=0){const opts=S.tasks.map(function(t,i){return t.open&&!t.hidden?i:-1}).filter(function(i){return i>=0&&i!==S.working});if(opts.length){S.working=opts[Math.floor(Math.random()*opts.length)];S.holdSecs=0;sfx("steal");const cur=document.getElementById("cur");if(cur){cur.textContent="Now on: "+S.tasks[S.working].title;cur.classList.remove("flash");void cur.offsetWidth;cur.classList.add("flash")}renderTasks()}S.switchT=18+Math.random()*10}
-    if(S.weather==="clear"&&S.nextBoss<=0){callBoss();S.nextBoss=55+Math.random()*25}
-    if(S.weather==="clear"&&!S.vanish&&Math.random()<0.0012){const side=S.tasks.find(function(t){return t.open&&t.kind!=="main"&&!t.hidden});if(side){side.hidden=true;S.vanish=side;renderTasks()}}
+    if(S.weather==="clear"&&S.waveT<=0){wave();S.weather="wave";setTimeout(function(){if(S.weather==="wave")S.weather="clear"},4000);S.waveT=26+Math.random()*10-band()}
+    if(S.day>=5&&S.weather==="clear"&&S.shameT<=0){const sh=document.getElementById("shame");sh.classList.add("on","hard");sfx("shame");holding=false;S.weather="shame";S.focus=clamp(S.focus-8,0,100);S.patience=clamp(S.patience-5,0,100);setTimeout(function(){sh.classList.remove("on","hard");if(S.weather==="shame")S.weather="clear"},900);S.shameT=42+Math.random()*18}
+    if(S.day>=4&&S.weather==="clear"&&S.switchT<=0){const opts=S.tasks.map(function(t,i){return t.open&&!t.hidden?i:-1}).filter(function(i){return i>=0&&i!==S.working});if(opts.length){S.working=opts[Math.floor(Math.random()*opts.length)];S.holdSecs=0;sfx("steal");const cur=document.getElementById("cur");if(cur){cur.textContent="Now on: "+S.tasks[S.working].title;cur.classList.remove("flash");void cur.offsetWidth;cur.classList.add("flash")}renderTasks()}S.switchT=22+Math.random()*10}
+    if(S.weather==="clear"&&S.nextBoss<=0){callBoss();S.nextBoss=60+Math.random()*25}
+    if(S.day>=6&&S.weather==="clear"&&!S.vanish&&Math.random()<0.0012){const side=S.tasks.find(function(t){return t.open&&t.kind!=="main"&&!t.hidden});if(side){side.hidden=true;S.vanish=side;renderTasks()}}
     else if(S.vanish&&Math.random()<0.002){S.vanish.hidden=false;toast("You forgot this was open: "+S.vanish.title);S.time+=7;S.vanish=null;renderTasks()}
     if(S.off&&Math.random()<0.01)spawn(homeLines[Math.floor(Math.random()*homeLines.length)],"home");
     const locked=performance.now()<S.lockUntil;
-    const morning=S.time<S.start+90?0.55:1;
+    const morning=S.time<S.start+90?0.7:1;
     if(holding&&!S.boss&&!locked&&S.working>=0){
       const t=S.tasks[S.working];S.holdSecs+=dt;S.heldLong+=dt;
-      if(t&&t.kind!=="main"&&S.holdSecs>7){S.lockUntil=performance.now()+3500;holding=false;lockHold();toast("Hyperfocus. You cannot drop the wrong thing yet.")}
+      if(t&&t.kind!=="main"&&S.holdSecs>8){S.lockUntil=performance.now()+3000;holding=false;lockHold();toast("Hyperfocus. You cannot drop the wrong thing yet.")}
       if(t&&t.open){
-        const juice=(S.energy<8?3.2:(S.medOn?16:10))*(S.focus/100)*(0.45+S.energy/140)*morning*(S.focusBoost?1.35:1);
+        const juice=(S.energy<8?4:(S.medOn?18:11))*(S.focus/100)*(0.5+S.energy/140)*morning*(S.focusBoost?1.35:1)*juiceMul();
         let add=juice*dt;
-        if(t.prog>=94&&t.prog<100){if(S.stuck.indexOf(S.working)<0)S.stuck.push(S.working);if(!(holding&&bubbles.filter(function(b){return b.kind==="late"}).length<=3))add*=0.12}
+        if(t.prog>=94&&t.prog<100){if(S.stuck.indexOf(S.working)<0)S.stuck.push(S.working);if(!(holding&&bubbles.filter(function(b){return b.kind==="late"}).length<=3))add*=0.18+Math.max(0,0.2-band()*0.04)}
         t.prog=clamp(t.prog+add,0,100);
         S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
         S.energy=clamp(S.energy-(S.energy<8?1.2:3)*dt,0,100);
         if(t.prog>=100){S.stuck=S.stuck.filter(i=>i!==S.working);closeWorking()}
       }
     }else{
-      S.focus=clamp(S.focus-5*dt,0,100);
-      S.energy=clamp(S.energy-0.6*dt,0,100);
-      S.tasks.forEach(function(t){if(t.open&&t.kind!=="main")t.prog=Math.max(0,t.prog-1.2*dt)});
+      S.focus=clamp(S.focus-4*dt,0,100);
+      S.energy=clamp(S.energy-0.5*dt,0,100);
+      S.tasks.forEach(function(t){if(t.open&&t.kind!=="main")t.prog=Math.max(0,t.prog-(0.7+band()*0.15)*dt)});
     }
-    if(S.time>=S.end&&!S.off){S.off=true;toast(S.home+" is the clock now.")}
+    if(S.time>=S.end&&!S.off){S.off=true;toast("Five o'clock. Home is the clock now.")}
     if(S.time>=S.end+180){show("end");return}
     const t=S.tasks[S.working],fill=document.getElementById("pfill");
     if(fill&&t)fill.style.width=t.prog+"%";
@@ -540,8 +552,16 @@ function startLoop(){
   };
   loop=requestAnimationFrame(step);
 }
-document.body.addEventListener("pointerdown",armAudio,{once:true});
-show("menu");
+
+function leaveIntro(){
+  const el=document.getElementById("intro");
+  if(!el||el.classList.contains("hide"))return;
+  armAudio();
+  el.classList.add("hide");
+  setTimeout(function(){el.remove();show("menu")},560);
+}
+document.getElementById("intro").addEventListener("pointerdown",leaveIntro);
+setTimeout(leaveIntro,2800);
 </script>
 </body>
 </html>
