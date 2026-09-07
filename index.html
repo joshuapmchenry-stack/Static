@@ -288,7 +288,7 @@ function show(id){
     const got=payout();
     S.focusBoost=0;S.slowClock=0;
     persist();
-    st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?"The thing got done. The pile may not have.":"The thing did not finish. It will be here in the morning.")+'</h2><p>'+S.name+" clocked out at "+clockTxt(S.time)+". "+S.home+" got whoever arrived.</p><div class="grid"><div><b>"+S.done+"</b>closed</div><div><b>"+S.tasks.filter(t=>t.open).length+"</b>carried</div><div><b>"+got+"</b>spoons today</div><div><b>"+S.spoons+"</b>in the jar</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'shop\')">Spend spoons</button>';
+    st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?'The thing got done. The pile may not have.':'The thing did not finish. It will be here in the morning.')+'</h2><p>'+S.name+' clocked out at '+clockTxt(S.time)+'. '+S.home+' got whoever arrived.</p><div class="grid"><div><b>'+S.done+'</b>closed</div><div><b>'+S.tasks.filter(function(t){return t.open}).length+'</b>carried</div><div><b>'+got+'</b>spoons today</div><div><b>'+S.spoons+'</b>in the jar</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'shop\')">Spend spoons</button>';
   }
 }
 function seedDay(){
