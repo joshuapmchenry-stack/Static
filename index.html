@@ -62,7 +62,7 @@
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
     .grid div{background:#1b2824;border-radius:12px;padding:12px;font-size:12px;color:var(--muted)}
     .grid b{display:block;color:var(--ink);font-size:20px;font-family:ui-serif,Georgia,serif}
-    .times{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .times{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   </style>
 </head>
 <body>
@@ -79,36 +79,325 @@
 <div class="popup" id="popup"></div>
 <div id="bubbles"></div>
 <script>
+const KEY="static-save-v1";
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-const mil=m=>{const x=((Math.floor(m)%1440)+1440)%1440;return String(Math.floor(x/60)).padStart(2,"0")+String(x%60).padStart(2,"0")};
+const clockTxt=m=>{
+  const x=((Math.floor(m)%1440)+1440)%1440;
+  let h=Math.floor(x/60),min=x%60,ap=h>=12?"PM":"AM";
+  h=h%12;if(!h)h=12;
+  return h+":"+String(min).padStart(2,"0")+" "+ap;
+};
 const lateThoughts=["Already behind.","Don't look.","Look at the clock.","They think you don't care.","Just start.","This should be easy.","You'll stay late.","One more minute.","You forgot something.","Why is this hard."];
 const workAsks=["Can you just…","Two minutes.","Forwarding this.","Got a sec?"];
 const bossLines=["Status on the main thing.","I asked about this.","Even if it's done I need it again.","Why isn't this closed.","Walk me through it. Now."];
 const homeLines=["You leaving?","Still there?","Dinner's ready.","Can you pick up."];
+const extras=["Email you said you'd send.","Form from last week.","That thing in drafts.","Calendar hold you never booked."];
 let S,loop=0,holding=false,bubbles=[],raf=0,scene="setup",glance=true;
 const clockEl=document.getElementById("clock"),eBar=document.getElementById("eBar"),fBar=document.getElementById("fBar"),pBar=document.getElementById("pBar"),med=document.getElementById("med");
-clockEl.onclick=()=>{if(!S||scene!=="desk")return;glance=true;clockEl.textContent=mil(S.time);S.focus=clamp(S.focus-2,0,100)};
-function fresh(form){return{name:form.name||"You",job:form.job||"work",home:form.home||"someone at home",start:form.start??8*60,end:form.end??17*60,important:form.important||"The one thing that actually matters",meds:!!form.meds,medOn:!!form.meds,time:form.wake??7*60,energy:62,focus:36,patience:70,peach:0,interrupts:0,started:0,done:0,working:0,tasks:[],off:false,coffee:2,pills:form.meds?1:0,lockUntil:0,holdSecs:0,waveT:16,boss:null,bossLeft:2,nextBoss:28,vanish:null,shameT:34,switchT:20,stuck:new Set(),weather:"clear",heldLong:0}}
-function hud(){if(document.getElementById("hud").hidden)return;clockEl.textContent=glance?mil(S.time):"????";eBar.style.width=S.energy+"%";fBar.style.width=S.focus+"%";pBar.style.width=S.patience+"%";med.textContent=S.meds?(S.medOn?"meds: holding":"meds: crashed"):"meds: none"}
-function weather(){if(!S.meds){S.medOn=false;return}if(S.time>=S.start+6*60)S.medOn=Math.random()>0.7;else if(S.time>=S.start+2*60)S.medOn=Math.random()>0.45;else S.medOn=true}
-function addTask(title,kind){if(!S||S.tasks.some(t=>t.title===title))return;S.tasks.push({title,kind:kind||"side",prog:0,open:true,hidden:false});S.started++;renderTasks()}
-function renderTasks(){const box=document.getElementById("taskbox");if(!box||!S)return;const rows=S.tasks.filter(t=>t.open&&!t.hidden);box.innerHTML=rows.map(t=>{const i=S.tasks.indexOf(t);return '<div class="task '+(t.kind==="main"?"main":"")+'"><span>'+t.title+'<div class="tiny">'+Math.floor(t.prog)+'% · '+(t.kind==="main"?"THE thing":t.kind)+(S.stuck.has(i)?" · stuck":"")+'</div></span><button type="button" onclick="pickTask('+i+')">'+(S.working===i?"Current":"Work")+"</button></div>"}).join("")||'<div class="tiny">No open Taskers. (or they slipped)</div>'}
-function pickTask(i){if(!S.tasks[i]||S.tasks[i].hidden)return;if(S.working!==i)S.focus=clamp(S.focus-14,0,100);S.working=i;S.holdSecs=0;S.lockUntil=0;const cur=document.getElementById("cur");if(cur)cur.textContent=S.tasks[i].title;renderTasks();hud()}
-function closeWorking(){const t=S.tasks[S.working];if(!t||!t.open)return;t.open=false;t.prog=100;S.done++;S.working=S.tasks.findIndex(x=>x.open&&!x.hidden);const cur=document.getElementById("cur");if(cur)cur.textContent=S.working>=0?S.tasks[S.working].title:"Clear";renderTasks()}
-function spawn(text,kind){const host=document.getElementById("app").getBoundingClientRect();const layer=document.getElementById("bubbles");if(!layer)return;const el=document.createElement("button");el.type="button";el.className="bubble"+(kind==="work"?" work":kind==="home"?" home":kind==="boss"?" boss":"");el.textContent=kind==="boss"?text+"  ·  6 taps":text;layer.appendChild(el);const w=kind==="boss"?168:kind==="home"?140:120;const b={el,kind,text,x:10+Math.random()*Math.max(20,host.width-w-20),y:kind==="boss"?160:90+Math.random()*Math.max(60,host.height-240),vx:(0.7+Math.random())*(Math.random()>.5?1:-1),vy:(0.7+Math.random())*(Math.random()>.5?1:-1)};el.style.left=b.x+"px";el.style.top=b.y+"px";el.onclick=e=>{e.stopPropagation();if(kind==="boss"){if(!S.boss)return;S.boss.hits++;el.classList.remove("hit");void el.offsetWidth;el.classList.add("hit");el.textContent=text+"  ·  "+(S.boss.need-S.boss.hits)+" taps";S.focus=clamp(S.focus-3,0,100);S.time+=1;if(S.boss.hits>=S.boss.need){el.remove();bubbles=bubbles.filter(x=>x!==b);S.boss=null;S.weather="clear";lockHold();toast("They're gone. For now.")}hud();return}if(kind==="late"){S.peach++;S.time+=S.peach===1?1:Math.min(10,S.peach*2);S.focus=clamp(S.focus-5,0,100);holding=false;if(S.peach===1)toast("Looking at the thought is the tax.")}else if(kind==="home"){S.time+=4;S.patience=clamp(S.patience-6,0,100);holding=false}else if(!S.off){S.interrupts++;S.time+=5+Math.floor(Math.random()*8);S.focus=clamp(S.focus-12,0,100);S.patience=clamp(S.patience-4,0,100);addTask(text,"interrupt");holding=false}el.remove();bubbles=bubbles.filter(x=>x!==b);setTimeout(function(){if(scene==="desk"&&kind!=="boss"&&!(kind==="work"&&S.off)&&kind!=="home")spawn(text,kind)},kind==="work"?16000:900);hud()};bubbles.push(b);if(kind==="boss")lockHold()}
-function tickBubbles(){const host=document.getElementById("app").getBoundingClientRect();const extra=S?S.tasks.filter(t=>t.open).length:0;const crash=S&&S.meds&&!S.medOn?1.35:1;const sp=(1.2+extra*0.2)*crash;bubbles.forEach(b=>{const m=b.kind==="late"?sp:b.kind==="boss"?0.85:1;b.x+=b.vx*m;b.y+=b.vy*m;const w=b.el.offsetWidth||120,h=b.el.offsetHeight||48;if(b.x<6||b.x>host.width-w-6)b.vx*=-1;if(b.y<78||b.y>host.height-h-16)b.vy*=-1;b.x=clamp(b.x,6,Math.max(6,host.width-w-6));b.y=clamp(b.y,78,Math.max(78,host.height-h-16));b.el.style.left=b.x+"px";b.el.style.top=b.y+"px"});raf=requestAnimationFrame(tickBubbles)}
+clockEl.onclick=()=>{if(!S||scene!=="desk")return;glance=true;clockEl.textContent=clockTxt(S.time);S.focus=clamp(S.focus-2,0,100)};
+
+function blankMeta(){
+  return {name:"You",job:"work",home:"someone at home",start:9*60,end:17*60,meds:false,day:1,spoons:0,focusBoost:0,slowClock:0};
+}
+function loadSave(){try{return JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){return null}}
+function persist(){
+  if(!S)return;
+  const pack={
+    meta:{name:S.name,job:S.job,home:S.home,start:S.start,end:S.end,meds:S.meds,day:S.day,spoons:S.spoons,focusBoost:S.focusBoost,slowClock:S.slowClock},
+    coffee:S.coffee,pills:S.pills,energy:S.energy,patience:S.patience,
+    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open})),
+    important:S.important
+  };
+  localStorage.setItem(KEY,JSON.stringify(pack));
+}
+function wipe(){localStorage.removeItem(KEY)}
+
+function freshFromForm(form,carry){
+  const meta=carry&&carry.meta?carry.meta:blankMeta();
+  const name=form&&form.name||meta.name;
+  const job=form&&form.job||meta.job;
+  const home=form&&form.home||meta.home;
+  const start=form&&form.start!=null?form.start:meta.start;
+  const end=form&&form.end!=null?form.end:meta.end;
+  const meds=form&&form.meds!=null?!!form.meds:!!meta.meds;
+  const leftover=(carry&&carry.tasks||[]).filter(t=>t.open).map(t=>({title:t.title,kind:t.kind==="main"?"side":t.kind,prog:Math.max(0,(t.prog||0)*0.85),open:true,hidden:false}));
+  const important=form&&form.important||("Day "+(meta.day||1)+" — the one thing");
+  return {
+    name,job,home,start,end,important,meds,medOn:!!meds,
+    day:meta.day||1,spoons:meta.spoons||0,focusBoost:meta.focusBoost||0,slowClock:meta.slowClock||0,
+    time:start-30,energy:carry?clamp((carry.energy||50)+18,28,78):58,focus:32,patience:carry?clamp((carry.patience||70)+12,35,85):70,
+    peach:0,interrupts:0,started:0,done:0,working:0,tasks:[],off:false,
+    coffee:carry&&carry.coffee!=null?carry.coffee:2,pills:carry&&carry.pills!=null?carry.pills:(meds?1:0),
+    lockUntil:0,holdSecs:0,waveT:16,boss:null,bossLeft:2,nextBoss:28,vanish:null,shameT:34,switchT:20,
+    stuck:[],weather:"clear",heldLong:0,leftover:leftover
+  };
+}
+function hud(){
+  if(document.getElementById("hud").hidden)return;
+  clockEl.textContent=glance?clockTxt(S.time):"????";
+  eBar.style.width=S.energy+"%"; fBar.style.width=S.focus+"%"; pBar.style.width=S.patience+"%";
+  med.textContent="Day "+S.day+" · "+S.spoons+" spoons · "+(S.meds?(S.medOn?"meds: holding":"meds: crashed"):"meds: none");
+}
+function weather(){
+  if(!S.meds){S.medOn=false;return}
+  if(S.time>=S.start+6*60) S.medOn=Math.random()>0.7;
+  else if(S.time>=S.start+2*60) S.medOn=Math.random()>0.45;
+  else S.medOn=true;
+}
+function addTask(title,kind,prog){
+  if(!S||S.tasks.some(t=>t.title===title))return;
+  S.tasks.push({title,kind:kind||"side",prog:prog||0,open:true,hidden:false});
+  S.started++; renderTasks();
+}
+function renderTasks(){
+  const box=document.getElementById("taskbox");
+  if(!box||!S)return;
+  const rows=S.tasks.filter(t=>t.open&&!t.hidden);
+  box.innerHTML=rows.map(t=>{
+    const i=S.tasks.indexOf(t);
+    return '<div class="task '+(t.kind==="main"?"main":"")+'"><span>'+t.title+'<div class="tiny">'+Math.floor(t.prog)+"% · "+(t.kind==="main"?"THE thing":t.kind)+(S.stuck.indexOf(i)>=0?" · stuck":"")+'</div></span><button type="button" onclick="pickTask('+i+')">'+(S.working===i?"Current":"Work")+"</button></div>";
+  }).join("")||'<div class="tiny">No open Taskers. (or they slipped)</div>';
+}
+function pickTask(i){
+  if(!S.tasks[i]||S.tasks[i].hidden)return;
+  if(S.working!==i)S.focus=clamp(S.focus-14,0,100);
+  S.working=i;S.holdSecs=0;S.lockUntil=0;
+  const cur=document.getElementById("cur");
+  if(cur)cur.textContent=S.tasks[i].title;
+  renderTasks();hud();
+}
+function closeWorking(){
+  const t=S.tasks[S.working];
+  if(!t||!t.open)return;
+  t.open=false;t.prog=100;S.done++;
+  S.working=S.tasks.findIndex(x=>x.open&&!x.hidden);
+  const cur=document.getElementById("cur");
+  if(cur)cur.textContent=S.working>=0?S.tasks[S.working].title:"Clear";
+  renderTasks();persist();
+}
+function spawn(text,kind){
+  const host=document.getElementById("app").getBoundingClientRect();
+  const layer=document.getElementById("bubbles");
+  if(!layer)return;
+  const el=document.createElement("button");
+  el.type="button";
+  el.className="bubble"+(kind==="work"?" work":kind==="home"?" home":kind==="boss"?" boss":"");
+  el.textContent=kind==="boss"?text+"  ·  6 taps":text;
+  layer.appendChild(el);
+  const w=kind==="boss"?168:kind==="home"?140:120;
+  const b={el,kind,text,x:10+Math.random()*Math.max(20,host.width-w-20),y:kind==="boss"?160:90+Math.random()*Math.max(60,host.height-240),vx:(0.7+Math.random())*(Math.random()>.5?1:-1),vy:(0.7+Math.random())*(Math.random()>.5?1:-1)};
+  el.style.left=b.x+"px";el.style.top=b.y+"px";
+  el.onclick=e=>{
+    e.stopPropagation();
+    if(kind==="boss"){
+      if(!S.boss)return;
+      S.boss.hits++;el.classList.remove("hit");void el.offsetWidth;el.classList.add("hit");
+      el.textContent=text+"  ·  "+(S.boss.need-S.boss.hits)+" taps";
+      S.focus=clamp(S.focus-3,0,100);S.time+=1;
+      if(S.boss.hits>=S.boss.need){el.remove();bubbles=bubbles.filter(x=>x!==b);S.boss=null;S.weather="clear";lockHold();toast("They're gone. For now.")}
+      hud();return;
+    }
+    if(kind==="late"){S.peach++;S.time+=S.peach===1?1:Math.min(10,S.peach*2);S.focus=clamp(S.focus-5,0,100);holding=false;if(S.peach===1)toast("Looking at the thought is the tax.")}
+    else if(kind==="home"){S.time+=4;S.patience=clamp(S.patience-6,0,100);holding=false}
+    else if(!S.off){S.interrupts++;S.time+=5+Math.floor(Math.random()*8);S.focus=clamp(S.focus-12,0,100);S.patience=clamp(S.patience-4,0,100);addTask(text,"interrupt");holding=false}
+    el.remove();bubbles=bubbles.filter(x=>x!==b);
+    setTimeout(function(){if(scene==="desk"&&kind!=="boss"&&!(kind==="work"&&S.off)&&kind!=="home")spawn(text,kind)},kind==="work"?16000:900);
+    hud();
+  };
+  bubbles.push(b);if(kind==="boss")lockHold();
+}
+function tickBubbles(){
+  const host=document.getElementById("app").getBoundingClientRect();
+  const extra=S?S.tasks.filter(t=>t.open).length:0;
+  const crash=S&&S.meds&&!S.medOn?1.35:1;
+  const sp=(1.2+extra*0.2)*crash;
+  bubbles.forEach(b=>{
+    const m=b.kind==="late"?sp:b.kind==="boss"?0.85:1;
+    b.x+=b.vx*m;b.y+=b.vy*m;
+    const w=b.el.offsetWidth||120,h=b.el.offsetHeight||48;
+    if(b.x<6||b.x>host.width-w-6)b.vx*=-1;
+    if(b.y<78||b.y>host.height-h-16)b.vy*=-1;
+    b.x=clamp(b.x,6,Math.max(6,host.width-w-6));
+    b.y=clamp(b.y,78,Math.max(78,host.height-h-16));
+    b.el.style.left=b.x+"px";b.el.style.top=b.y+"px";
+  });
+  raf=requestAnimationFrame(tickBubbles);
+}
 function clearBubbles(){cancelAnimationFrame(raf);raf=0;bubbles.forEach(b=>b.el.remove());bubbles=[]}
 function toast(html){const p=document.getElementById("popup");p.innerHTML='<div class="sheet"><p>'+html+'</p><button class="btn main" type="button" onclick="document.getElementById(\'popup\').classList.remove(\'show\')">Ok</button></div>';p.classList.add("show")}
 function parseHM(v,fb){if(!v||!v.includes(":"))return fb;const p=v.split(":");return (+p[0])*60+(+p[1])}
 function lockHold(){const btn=document.getElementById("hold");if(!btn)return;const blocked=!!(S&&S.boss)||performance.now()<(S&&S.lockUntil||0);btn.disabled=blocked;btn.classList.toggle("locked",blocked);btn.textContent=S&&S.boss?"Deal with them first":(blocked?"Stuck on this":"Hold to focus")}
-function sip(){if(!S||S.coffee<=0)return;S.coffee--;S.energy=clamp(S.energy+28,0,100);S.focus=clamp(S.focus+6,0,100);toast("Coffee. Tasks will move until it doesn't.")}
-function pill(){if(!S||!S.meds||S.pills<=0)return;S.pills--;S.medOn=true;S.energy=clamp(S.energy+18,0,100);S.focus=clamp(S.focus+10,0,100);toast("Onboard. Weather still changes later.")}
+function sip(){if(!S||S.coffee<=0)return;S.coffee--;S.energy=clamp(S.energy+28,0,100);S.focus=clamp(S.focus+6,0,100);persist();toast("Coffee. Tasks will move until it doesn't.")}
+function pill(){if(!S||!S.meds||S.pills<=0)return;S.pills--;S.medOn=true;S.energy=clamp(S.energy+18,0,100);S.focus=clamp(S.focus+10,0,100);persist();toast("Onboard. Weather still changes later.")}
 function wave(){if(scene!=="desk")return;const n=3+Math.min(6,S.tasks.filter(t=>t.open).length);for(let i=0;i<n;i++)setTimeout(function(){if(scene==="desk")spawn(lateThoughts[Math.floor(Math.random()*lateThoughts.length)],"late")},i*90)}
 function callBoss(){if(S.boss||S.bossLeft<=0||scene!=="desk")return;S.bossLeft--;S.boss={hits:0,need:6};S.weather="boss";spawn(bossLines[Math.floor(Math.random()*bossLines.length)],"boss");S.patience=clamp(S.patience-8,0,100);holding=false;lockHold()}
-function show(id){scene=id;clearBubbles();holding=false;const st=document.getElementById("stage");if(id==="setup"){document.getElementById("hud").hidden=true;st.innerHTML='<div class="kicker">ADHD desk sim</div><h1>Static</h1><p>Not a diagnosis. Time lies unless you tap the clock. Tasks wander. Closing the last percent is the tax.</p><label class="tiny">Your name</label><input id="nm" placeholder="Alex" /><label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher" /><label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids" /><label class="tiny">The one thing that actually matters today</label><input id="imp" placeholder="Finish the report" /><label class="tiny">Wake · start · end</label><div class="times"><input id="wk" type="time" value="06:30" /><input id="stt" type="time" value="08:00" /><input id="en" type="time" value="17:00" /></div><label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" />I take stimulant meds</label><button class="btn main" type="button" onclick="begin()">Start the day</button><p class="tiny">Tap the clock to see it. Keep clicking THE thing. Coffee/meds spend charges.</p>';return}if(id==="desk"){document.getElementById("hud").hidden=false;st.innerHTML='<div class="kicker">'+S.job+' · hold to work</div><h2 id="cur">'+S.important+'</h2><div class="prog"><i id="pfill"></i></div><button id="hold" type="button">Hold to focus</button><div class="row"><button class="btn" type="button" id="coffeeBtn">Coffee</button><button class="btn" type="button" id="medBtn">Meds</button></div><p class="tiny">Clock is a guess until you tap it. The list will steal you.</p><div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div><button class="btn" type="button" onclick="show(\'end\')">End the day</button>';document.getElementById("coffeeBtn").onclick=sip;document.getElementById("medBtn").onclick=pill;if(!S.meds)document.getElementById("medBtn").disabled=true;bindHold();renderTasks();lateThoughts.sort(function(){return Math.random()-.5}).slice(0,5).forEach(function(t){spawn(t,"late")});workAsks.slice(0,2).forEach(function(t){spawn(t,"work")});tickBubbles();startLoop();hud();lockHold();return}if(id==="end"){const main=S.tasks.find(function(t){return t.kind==="main"});st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?"The thing got done. The cost is below.":"The thing did not finish. That is the usual ending.")+'</h2><p>'+S.name+" did "+S.job+". "+S.home+" got whoever arrived at "+mil(S.time)+'.</p><div class="grid"><div><b>'+S.done+"</b>closed</div><div><b>"+S.started+"</b>opened</div><div><b>"+S.interrupts+"</b>hallway asks</div><div><b>"+S.peach+'</b>thought taps</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'setup\')">New person</button>'}}
-function begin(){S=fresh({name:document.getElementById("nm").value.trim(),job:document.getElementById("jb").value.trim(),home:document.getElementById("hm").value.trim(),important:document.getElementById("imp").value.trim(),wake:parseHM(document.getElementById("wk").value,6*60+30),start:parseHM(document.getElementById("stt").value,8*60),end:parseHM(document.getElementById("en").value,17*60),meds:document.getElementById("md").checked});S.tasks=[];S.started=0;addTask(S.important,"main");addTask("Inbox that will not zero","side");addTask("Something promised yesterday","side");S.working=0;glance=false;show("desk")}
-function bindHold(){const btn=document.getElementById("hold");if(!btn)return;const on=function(e){e.preventDefault();if(S.boss||performance.now()<S.lockUntil)return;holding=true;btn.classList.add("down")};const off=function(){if(holding&&S&&S.heldLong>2.2){S.time+=6+Math.floor(Math.random()*8);glance=false}S.heldLong=0;holding=false;btn.classList.remove("down");hud()};btn.addEventListener("pointerdown",on);btn.addEventListener("pointerup",off);btn.addEventListener("pointercancel",off);btn.addEventListener("pointerleave",off)}
-function startLoop(){cancelAnimationFrame(loop);let last=performance.now();const step=function(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(scene!=="desk"||!S)return;S.time+=dt*2.6;S.waveT-=dt;S.shameT-=dt;S.switchT-=dt;S.nextBoss-=dt;if(S.time>=S.start+2*60)weather();if(S.weather==="clear"&&S.waveT<=0){wave();S.weather="wave";setTimeout(function(){if(S.weather==="wave")S.weather="clear"},4000);S.waveT=22+Math.random()*10}if(S.weather==="clear"&&S.shameT<=0){document.getElementById("shame").classList.add("on");holding=false;S.weather="shame";S.focus=clamp(S.focus-8,0,100);S.patience=clamp(S.patience-5,0,100);setTimeout(function(){document.getElementById("shame").classList.remove("on");if(S.weather==="shame")S.weather="clear"},900);S.shameT=36+Math.random()*18}if(S.weather==="clear"&&S.switchT<=0){const opts=S.tasks.map(function(t,i){return t.open&&!t.hidden?i:-1}).filter(function(i){return i>=0&&i!==S.working});if(opts.length){S.working=opts[Math.floor(Math.random()*opts.length)];S.holdSecs=0;const cur=document.getElementById("cur");if(cur){cur.textContent="Now on: "+S.tasks[S.working].title;cur.classList.remove("flash");void cur.offsetWidth;cur.classList.add("flash")}renderTasks()}S.switchT=18+Math.random()*10}if(S.weather==="clear"&&S.nextBoss<=0){callBoss();S.nextBoss=55+Math.random()*25}if(S.weather==="clear"&&!S.vanish&&Math.random()<0.0012){const side=S.tasks.find(function(t){return t.open&&t.kind!=="main"&&!t.hidden});if(side){side.hidden=true;S.vanish=side;renderTasks()}}else if(S.vanish&&Math.random()<0.002){S.vanish.hidden=false;toast("You forgot this was open: "+S.vanish.title);S.time+=7;S.vanish=null;renderTasks()}if(S.off&&Math.random()<0.01)spawn(homeLines[Math.floor(Math.random()*homeLines.length)],"home");const locked=performance.now()<S.lockUntil;if(holding&&!S.boss&&!locked&&S.working>=0){const t=S.tasks[S.working];S.holdSecs+=dt;S.heldLong+=dt;if(t&&t.kind!=="main"&&S.holdSecs>7){S.lockUntil=performance.now()+3500;holding=false;lockHold();toast("Hyperfocus. You cannot drop the wrong thing yet.")}if(t&&t.open){const juice=(S.energy<8?3.2:(S.medOn?16:10))*(S.focus/100)*(0.45+S.energy/140);let add=juice*dt;if(t.prog>=94&&t.prog<100){S.stuck.add(S.working);if(!(holding&&bubbles.filter(function(b){return b.kind==="late"}).length<=3))add*=0.12}t.prog=clamp(t.prog+add,0,100);S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);S.energy=clamp(S.energy-(S.energy<8?1.2:3)*dt,0,100);if(t.prog>=100){S.stuck.delete(S.working);closeWorking()}}}else{S.focus=clamp(S.focus-5*dt,0,100);S.energy=clamp(S.energy-0.6*dt,0,100);S.tasks.forEach(function(t){if(t.open&&t.kind!=="main")t.prog=Math.max(0,t.prog-1.2*dt)})}if(S.time>=S.end&&!S.off){S.off=true;toast(S.home+" is the clock now.")}if(S.time>=S.end+180){show("end");return}const t=S.tasks[S.working],fill=document.getElementById("pfill");if(fill&&t)fill.style.width=t.prog+"%";lockHold();const cb=document.getElementById("coffeeBtn"),mb=document.getElementById("medBtn");if(cb)cb.textContent="Coffee ("+S.coffee+" left)";if(mb)mb.textContent="Meds ("+S.pills+" left)";hud();loop=requestAnimationFrame(step)};loop=requestAnimationFrame(step)}
+
+function payout(){
+  const main=S.tasks.find(t=>t.kind==="main");
+  let n=2+S.done;
+  if(main&&main.prog>=100)n+=2;
+  if(S.patience<30)n-=1;
+  if(S.time>S.end+60)n-=1;
+  n=Math.max(1,n);
+  S.spoons+=n;
+  return n;
+}
+function buy(what){
+  const cost={coffee:2,meds:3,focus:3,slow:3}[what];
+  if(S.spoons<cost){toast("Not enough spoons.");return}
+  if(what==="coffee"){S.coffee+=2;S.spoons-=2}
+  if(what==="meds"){if(!S.meds){toast("You didn't check meds.");return}S.pills+=1;S.spoons-=3}
+  if(what==="focus"){S.focusBoost=1;S.spoons-=3}
+  if(what==="slow"){S.slowClock=1;S.spoons-=3}
+  persist();show("shop");
+}
+
+function show(id){
+  scene=id;clearBubbles();holding=false;
+  const st=document.getElementById("stage");
+  const save=loadSave();
+  if(id==="setup"){
+    document.getElementById("hud").hidden=true;
+    st.innerHTML='<div class="kicker">ADHD desk sim</div><h1>Static</h1><p>Days keep the pile. Spoons are what you spend so tomorrow hurts less. Time is 9 to 5 unless you change it.</p>'+
+      (save?'<button class="btn main" type="button" onclick="continueLife()">Continue Day '+(save.meta&&save.meta.day||"?")+' · '+(save.meta&&save.meta.spoons||0)+' spoons</button>':'')+
+      '<label class="tiny">Your name</label><input id="nm" placeholder="Alex" value="'+(save&&save.meta&&save.meta.name||"")+'" /><label class="tiny">What you do all day</label><input id="jb" placeholder="nurse, student, dispatcher" value="'+(save&&save.meta&&save.meta.job||"")+'" /><label class="tiny">Who is waiting after work</label><input id="hm" placeholder="partner, roommate, kids" value="'+(save&&save.meta&&save.meta.home||"")+'" /><label class="tiny">Today\'s one thing</label><input id="imp" placeholder="Finish the report" /><label class="tiny">Start · end</label><div class="times"><input id="stt" type="time" value="09:00" /><input id="en" type="time" value="17:00" /></div><label class="tiny"><input type="checkbox" id="md" style="width:auto;display:inline;margin-right:8px" '+(save&&save.meta&&save.meta.meds?"checked":"")+' />I take stimulant meds</label><button class="btn main" type="button" onclick="beginNew()">Start a new life</button>'+(save?'<button class="btn" type="button" onclick="wipe();show(\'setup\')">Erase this life</button>':'')+
+      '<p class="tiny">Saved on this phone only. Home Screen icon keeps it. Tap the clock to see it.</p>';
+    return;
+  }
+  if(id==="shop"){
+    document.getElementById("hud").hidden=true;
+    const open=S.tasks.filter(t=>t.open).length;
+    st.innerHTML='<div class="kicker">Night market</div><h2>Day '+S.day+' closed</h2><p>'+S.spoons+' spoons in the jar. '+open+' Taskers still on the desk.</p><div class="card"><div class="kicker">Spend</div><button class="btn" type="button" onclick="buy(\'coffee\')">Coffee +2 uses · 2 spoons</button><button class="btn" type="button" onclick="buy(\'meds\')" '+(S.meds?"":"disabled")+'>Meds +1 dose · 3 spoons</button><button class="btn" type="button" onclick="buy(\'focus\')">Tomorrow focuses faster · 3 spoons '+(S.focusBoost?"(on)":"")+'</button><button class="btn" type="button" onclick="buy(\'slow\')">Tomorrow the clock is kinder · 3 spoons '+(S.slowClock?"(on)":"")+'</button></div><button class="btn main" type="button" onclick="tomorrow()">Sleep. Day '+(S.day+1)+'.</button><button class="btn" type="button" onclick="persist();show(\'setup\')">Quit to title</button>';
+    return;
+  }
+  if(id==="desk"){
+    document.getElementById("hud").hidden=false;
+    st.innerHTML='<div class="kicker">'+S.job+' · day '+S.day+'</div><h2 id="cur">'+S.important+'</h2><div class="prog"><i id="pfill"></i></div><button id="hold" type="button">Hold to focus</button><div class="row"><button class="btn" type="button" id="coffeeBtn">Coffee</button><button class="btn" type="button" id="medBtn">Meds</button></div><p class="tiny">Morning is slow on purpose. The pile from yesterday is still here.</p><div class="card"><div class="kicker">Taskers</div><div id="taskbox"></div></div><button class="btn" type="button" onclick="endNow()">End the day</button>';
+    document.getElementById("coffeeBtn").onclick=sip;
+    document.getElementById("medBtn").onclick=pill;
+    if(!S.meds)document.getElementById("medBtn").disabled=true;
+    bindHold();renderTasks();
+    lateThoughts.sort(function(){return Math.random()-.5}).slice(0,5).forEach(function(t){spawn(t,"late")});
+    workAsks.slice(0,2).forEach(function(t){spawn(t,"work")});
+    tickBubbles();startLoop();hud();lockHold();
+    return;
+  }
+  if(id==="end"){
+    document.getElementById("hud").hidden=true;
+    const main=S.tasks.find(t=>t.kind==="main");
+    const got=payout();
+    S.focusBoost=0;S.slowClock=0;
+    persist();
+    st.innerHTML='<div class="kicker">After</div><h2>'+(main&&main.prog>=100?"The thing got done. The pile may not have.":"The thing did not finish. It will be here in the morning.")+'</h2><p>'+S.name+" clocked out at "+clockTxt(S.time)+". "+S.home+" got whoever arrived.</p><div class="grid"><div><b>"+S.done+"</b>closed</div><div><b>"+S.tasks.filter(t=>t.open).length+"</b>carried</div><div><b>"+got+"</b>spoons today</div><div><b>"+S.spoons+"</b>in the jar</div></div><p class="tiny">Not medical advice.</p><button class="btn main" type="button" onclick="show(\'shop\')">Spend spoons</button>';
+  }
+}
+function seedDay(){
+  addTask(S.important,"main",0);
+  (S.leftover||[]).forEach(t=>addTask(t.title,t.kind==="main"?"side":t.kind,t.prog));
+  if(!(S.leftover&&S.leftover.length)){
+    addTask("Inbox that will not zero","side",0);
+    addTask("Something promised yesterday","side",0);
+  }else if(Math.random()>0.35){
+    addTask(extras[Math.floor(Math.random()*extras.length)],"side",0);
+  }
+  S.working=0;
+}
+function beginNew(){
+  wipe();
+  S=freshFromForm({
+    name:document.getElementById("nm").value.trim(),
+    job:document.getElementById("jb").value.trim(),
+    home:document.getElementById("hm").value.trim(),
+    important:document.getElementById("imp").value.trim()||"The one thing that actually matters",
+    start:parseHM(document.getElementById("stt").value,9*60),
+    end:parseHM(document.getElementById("en").value,17*60),
+    meds:document.getElementById("md").checked
+  },null);
+  S.day=1;S.spoons=0;S.focusBoost=0;S.slowClock=0;
+  seedDay();glance=false;persist();show("desk");
+}
+function continueLife(){
+  const save=loadSave();
+  if(!save){show("setup");return}
+  const impEl=document.getElementById("imp");
+  S=freshFromForm({
+    name:(document.getElementById("nm")&&document.getElementById("nm").value.trim())||save.meta.name,
+    job:(document.getElementById("jb")&&document.getElementById("jb").value.trim())||save.meta.job,
+    home:(document.getElementById("hm")&&document.getElementById("hm").value.trim())||save.meta.home,
+    important:(impEl&&impEl.value.trim())||("Day "+save.meta.day+" — the one thing"),
+    start:save.meta.start,end:save.meta.end,meds:save.meta.meds
+  },save);
+  seedDay();glance=false;persist();show("desk");
+}
+function tomorrow(){
+  const d=S.day+1,fb=S.focusBoost,sc=S.slowClock,sp=S.spoons,cf=S.coffee,pi=S.pills;
+  const save={
+    meta:{name:S.name,job:S.job,home:S.home,start:S.start,end:S.end,meds:S.meds,day:d,spoons:sp,focusBoost:fb,slowClock:sc},
+    coffee:cf,pills:pi,energy:S.energy,patience:S.patience,
+    tasks:S.tasks.map(t=>({title:t.title,kind:t.kind,prog:t.prog,open:t.open})),
+    important:"Day "+d+" — the one thing"
+  };
+  localStorage.setItem(KEY,JSON.stringify(save));
+  S=freshFromForm({name:S.name,job:S.job,home:S.home,important:"Day "+d+" — the one thing",start:S.start,end:S.end,meds:S.meds},save);
+  S.day=d;S.spoons=sp;S.coffee=cf;S.pills=pi;S.focusBoost=fb;S.slowClock=sc;
+  seedDay();glance=false;persist();show("desk");
+}
+function endNow(){show("end")}
+function bindHold(){
+  const btn=document.getElementById("hold");if(!btn)return;
+  const on=function(e){e.preventDefault();if(S.boss||performance.now()<S.lockUntil)return;holding=true;btn.classList.add("down")};
+  const off=function(){if(holding&&S&&S.heldLong>2.2){S.time+=6+Math.floor(Math.random()*8);glance=false}S.heldLong=0;holding=false;btn.classList.remove("down");hud()};
+  btn.addEventListener("pointerdown",on);btn.addEventListener("pointerup",off);btn.addEventListener("pointercancel",off);btn.addEventListener("pointerleave",off);
+}
+function startLoop(){
+  cancelAnimationFrame(loop);
+  let last=performance.now();
+  const step=function(now){
+    const dt=Math.min(.05,(now-last)/1000);last=now;
+    if(scene!=="desk"||!S)return;
+    const speed=S.slowClock?1.7:2.6;
+    S.time+=dt*speed;
+    S.waveT-=dt;S.shameT-=dt;S.switchT-=dt;S.nextBoss-=dt;
+    if(S.time>=S.start+2*60)weather();
+    if(S.weather==="clear"&&S.waveT<=0){wave();S.weather="wave";setTimeout(function(){if(S.weather==="wave")S.weather="clear"},4000);S.waveT=22+Math.random()*10}
+    if(S.weather==="clear"&&S.shameT<=0){document.getElementById("shame").classList.add("on");holding=false;S.weather="shame";S.focus=clamp(S.focus-8,0,100);S.patience=clamp(S.patience-5,0,100);setTimeout(function(){document.getElementById("shame").classList.remove("on");if(S.weather==="shame")S.weather="clear"},900);S.shameT=36+Math.random()*18}
+    if(S.weather==="clear"&&S.switchT<=0){const opts=S.tasks.map(function(t,i){return t.open&&!t.hidden?i:-1}).filter(function(i){return i>=0&&i!==S.working});if(opts.length){S.working=opts[Math.floor(Math.random()*opts.length)];S.holdSecs=0;const cur=document.getElementById("cur");if(cur){cur.textContent="Now on: "+S.tasks[S.working].title;cur.classList.remove("flash");void cur.offsetWidth;cur.classList.add("flash")}renderTasks()}S.switchT=18+Math.random()*10}
+    if(S.weather==="clear"&&S.nextBoss<=0){callBoss();S.nextBoss=55+Math.random()*25}
+    if(S.weather==="clear"&&!S.vanish&&Math.random()<0.0012){const side=S.tasks.find(function(t){return t.open&&t.kind!=="main"&&!t.hidden});if(side){side.hidden=true;S.vanish=side;renderTasks()}}
+    else if(S.vanish&&Math.random()<0.002){S.vanish.hidden=false;toast("You forgot this was open: "+S.vanish.title);S.time+=7;S.vanish=null;renderTasks()}
+    if(S.off&&Math.random()<0.01)spawn(homeLines[Math.floor(Math.random()*homeLines.length)],"home");
+    const locked=performance.now()<S.lockUntil;
+    const morning=S.time<S.start+90?0.55:1;
+    if(holding&&!S.boss&&!locked&&S.working>=0){
+      const t=S.tasks[S.working];S.holdSecs+=dt;S.heldLong+=dt;
+      if(t&&t.kind!=="main"&&S.holdSecs>7){S.lockUntil=performance.now()+3500;holding=false;lockHold();toast("Hyperfocus. You cannot drop the wrong thing yet.")}
+      if(t&&t.open){
+        const juice=(S.energy<8?3.2:(S.medOn?16:10))*(S.focus/100)*(0.45+S.energy/140)*morning*(S.focusBoost?1.35:1);
+        let add=juice*dt;
+        if(t.prog>=94&&t.prog<100){if(S.stuck.indexOf(S.working)<0)S.stuck.push(S.working);if(!(holding&&bubbles.filter(function(b){return b.kind==="late"}).length<=3))add*=0.12}
+        t.prog=clamp(t.prog+add,0,100);
+        S.focus=clamp(S.focus+(S.medOn?4:1)*dt,0,100);
+        S.energy=clamp(S.energy-(S.energy<8?1.2:3)*dt,0,100);
+        if(t.prog>=100){S.stuck=S.stuck.filter(i=>i!==S.working);closeWorking()}
+      }
+    }else{
+      S.focus=clamp(S.focus-5*dt,0,100);
+      S.energy=clamp(S.energy-0.6*dt,0,100);
+      S.tasks.forEach(function(t){if(t.open&&t.kind!=="main")t.prog=Math.max(0,t.prog-1.2*dt)});
+    }
+    if(S.time>=S.end&&!S.off){S.off=true;toast(S.home+" is the clock now.")}
+    if(S.time>=S.end+180){show("end");return}
+    const t=S.tasks[S.working],fill=document.getElementById("pfill");
+    if(fill&&t)fill.style.width=t.prog+"%";
+    lockHold();
+    const cb=document.getElementById("coffeeBtn"),mb=document.getElementById("medBtn");
+    if(cb)cb.textContent="Coffee ("+S.coffee+" left)";
+    if(mb)mb.textContent="Meds ("+S.pills+" left)";
+    hud();
+    loop=requestAnimationFrame(step);
+  };
+  loop=requestAnimationFrame(step);
+}
 show("setup");
 </script>
 </body>
